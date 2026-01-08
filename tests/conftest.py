@@ -120,6 +120,23 @@ def valid_for_multi_decl():
 
 
 @pytest.fixture
+def valid_func_params_multiline():
+    """Function parameters spanning multiple lines should NOT trigger decl.single."""
+    return """static int handle_fi_node(struct Ast_node *tmp_root, struct Ast_node **root,
+                          int *count_if, int *res)
+{
+    return 0;
+}
+"""
+
+
+@pytest.fixture
+def valid_func_params_typed_after_comma():
+    """Function params with type after comma should NOT trigger decl.single."""
+    return "void foo(int a, int b, char c)\n{\n    return;\n}\n"
+
+
+@pytest.fixture
 def valid_fixed_array():
     return "void f(void) { int arr[10]; }\n"
 

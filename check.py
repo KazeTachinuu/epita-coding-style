@@ -448,11 +448,16 @@ class CodingStyleChecker:
         """Check declaration rules (single per line, no VLA)."""
 
         # decl.single: One declaration per line
+        # Match: "int a, b" but not "int a, int b" (function params)
         multi_decl = re.compile(
             r'^\s*(?:const\s+)?(?:unsigned\s+|signed\s+)?'
             r'(?:int|char|short|long|float|double)\s+'
             r'\*?\s*\w+\s*,\s*\*?\s*\w+'
         )
+
+        # Types that indicate function parameters, not variable declarations
+        type_keywords = {'int', 'char', 'short', 'long', 'float', 'double',
+                         'void', 'unsigned', 'signed', 'const', 'struct', 'union', 'enum'}
 
         brace_depth = 0
         for i, line in enumerate(lines):
@@ -462,6 +467,18 @@ class CodingStyleChecker:
             # Skip for loops (multiple declarations allowed)
             if 'for' in stripped:
                 continue
+
+            # Skip function parameter lines (end with ) or contain closing paren)
+            if stripped.endswith(')') or stripped.endswith(') {') or stripped.endswith('){'):
+                continue
+
+            # Skip lines that are clearly function parameter continuations
+            # (have type keyword after the comma, like "int *a, int *b")
+            if ',' in stripped:
+                after_comma = stripped.split(',', 1)[1].strip()
+                first_word = after_comma.split()[0].lstrip('*') if after_comma.split() else ''
+                if first_word in type_keywords:
+                    continue
 
             if multi_decl.match(stripped):
                 result.violations.append(Violation(

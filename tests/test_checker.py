@@ -162,6 +162,16 @@ class TestDeclSingle:
         path = temp_file(valid_for_multi_decl)
         assert not has_violation(checker.check_file(path), "decl.single")
 
+    def test_func_params_multiline_not_flagged(self, checker, temp_file, valid_func_params_multiline):
+        """Function parameters on multiple lines should NOT trigger decl.single."""
+        path = temp_file(valid_func_params_multiline)
+        assert not has_violation(checker.check_file(path), "decl.single")
+
+    def test_func_params_typed_after_comma_not_flagged(self, checker, temp_file, valid_func_params_typed_after_comma):
+        """Function params with types after comma should NOT trigger decl.single."""
+        path = temp_file(valid_func_params_typed_after_comma)
+        assert not has_violation(checker.check_file(path), "decl.single")
+
 
 class TestDeclVla:
     """decl.vla: no variable-length arrays."""
