@@ -87,9 +87,11 @@ class CheckResult:
 class CodingStyleChecker:
     """Checks C source files against EPITA coding style rules."""
 
-    def __init__(self, max_func_lines: int = 40, max_func_args: int = 4):
+    def __init__(self, max_func_lines: int = 40, max_func_args: int = 4,
+                 max_exported_funcs: int = 10):
         self.max_func_lines = max_func_lines
         self.max_func_args = max_func_args
+        self.max_exported_funcs = max_exported_funcs
 
     def check_file(self, filepath: str) -> CheckResult:
         """Check a single file for coding style violations."""
@@ -111,7 +113,9 @@ class CodingStyleChecker:
         checks = [
             self._check_file_rules,
             self._check_line_rules,
+            self._check_braces_rules,
             self._check_function_rules,
+            self._check_export_rules,
             self._check_naming_rules,
             self._check_preprocessor_rules,
             self._check_declaration_rules,
@@ -188,6 +192,155 @@ class CodingStyleChecker:
                     "file.trailing", "Trailing whitespace not allowed",
                     Severity.MINOR
                 ))
+
+    # ========================================================================
+    # Braces and indentation checks
+    # ========================================================================
+
+    def _check_braces_rules(self, filepath: str, content: str, lines: list[str], result: CheckResult):
+        """Check braces rules (Allman style, 4-space indentation, no tabs)."""
+
+        # Track context to avoid false positives
+        in_string = False
+        in_comment = False
+        in_multiline_comment = False
+
+        for i, line in enumerate(lines):
+            # Check for tabs (braces.indent: no tabs allowed)
+            if '\t' in line:
+                col = line.index('\t') + 1
+                result.violations.append(Violation(
+                    filepath, i + 1, col, "braces.indent",
+                    "Tabs not allowed, use 4 spaces for indentation"
+                ))
+
+            stripped = line.strip()
+
+            # Skip empty lines
+            if not stripped:
+                continue
+
+            # Skip preprocessor directives
+            if stripped.startswith('#'):
+                continue
+
+            # Track multiline comments
+            if '/*' in stripped and '*/' not in stripped:
+                in_multiline_comment = True
+                continue
+            if in_multiline_comment:
+                if '*/' in stripped:
+                    in_multiline_comment = False
+                continue
+
+            # Skip single-line comments
+            if stripped.startswith('//'):
+                continue
+
+            # braces: Opening brace must be on its own line (Allman style)
+            # Exception: array/struct initializers like "int arr[] = { 1, 2 };"
+            # Exception: do-while: "} while"
+            if '{' in stripped:
+                # Check if brace is NOT alone or at start of line
+                brace_pos = stripped.find('{')
+                before_brace = stripped[:brace_pos].strip()
+
+                # Skip initializers (has '=' before brace)
+                if '=' in before_brace:
+                    continue
+
+                # Skip empty braces on same line like "{ }"
+                if stripped == '{}' or stripped == '{ }':
+                    continue
+
+                # If there's code before the brace (not just whitespace), it's K&R style
+                if before_brace and before_brace not in ['do']:
+                    # Check it's not a string containing brace
+                    if '"' not in before_brace and "'" not in before_brace:
+                        result.violations.append(Violation(
+                            filepath, i + 1, brace_pos + 1, "braces",
+                            "Opening brace must be on its own line (Allman style)"
+                        ))
+
+            # braces: Closing brace must be on its own line
+            # Exception: do-while: "} while (...)"
+            # Exception: else: "} else"  - but in Allman these should be separate
+            if '}' in stripped:
+                brace_pos = stripped.find('}')
+                after_brace = stripped[brace_pos + 1:].strip()
+
+                # "} while" is allowed for do-while
+                if after_brace.startswith('while'):
+                    continue
+
+                # Check if there's non-comment content after the brace
+                if after_brace and not after_brace.startswith('//') and not after_brace.startswith('/*'):
+                    # Skip struct/enum definitions ending with "};"
+                    if after_brace == ';':
+                        continue
+                    # Skip array initializer endings like "},"
+                    if after_brace in [',', ');', ');,']:
+                        continue
+
+                    result.violations.append(Violation(
+                        filepath, i + 1, brace_pos + 1, "braces",
+                        "Closing brace must be on its own line (Allman style)"
+                    ))
+
+        # braces.indent: Check 4-space indentation
+        self._check_indentation(filepath, lines, result)
+
+    def _check_indentation(self, filepath: str, lines: list[str], result: CheckResult):
+        """Check that indentation uses 4 spaces per level."""
+        expected_indent = 0
+        in_multiline_comment = False
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+
+            # Skip empty lines
+            if not stripped:
+                continue
+
+            # Track multiline comments
+            if '/*' in line and '*/' not in line:
+                in_multiline_comment = True
+            if in_multiline_comment:
+                if '*/' in line:
+                    in_multiline_comment = False
+                continue
+
+            # Skip preprocessor (always at column 0)
+            if stripped.startswith('#'):
+                continue
+
+            # Calculate leading spaces
+            leading_spaces = len(line) - len(line.lstrip(' \t'))
+
+            # Adjust expected indent based on braces
+            # Decrease indent for closing braces before checking
+            if stripped.startswith('}') or stripped.startswith('case ') or stripped.startswith('default:'):
+                pass  # These can be at various indent levels
+            else:
+                # Check if indentation is a multiple of 4
+                if leading_spaces % 4 != 0 and leading_spaces > 0:
+                    # Allow continuation lines (might not be multiple of 4)
+                    # Heuristic: if previous line ends with operator or comma, it's continuation
+                    if i > 0:
+                        prev_stripped = lines[i - 1].strip()
+                        # Skip check for continuation lines
+                        if (prev_stripped.endswith(',') or
+                            prev_stripped.endswith('(') or
+                            prev_stripped.endswith('&&') or
+                            prev_stripped.endswith('||') or
+                            prev_stripped.endswith('+')):
+                            continue
+
+                    result.violations.append(Violation(
+                        filepath, i + 1, 1, "braces.indent",
+                        f"Indentation must be a multiple of 4 spaces (found {leading_spaces})",
+                        Severity.MINOR
+                    ))
 
     # ========================================================================
     # Function-level checks
@@ -333,6 +486,137 @@ class CodingStyleChecker:
         """Check if line is a comment."""
         return (line.startswith('//') or line.startswith('/*') or
                 line.startswith('**') or line.startswith('*') or line == '*/')
+
+    # ========================================================================
+    # Export rules
+    # ========================================================================
+
+    def _check_export_rules(self, filepath: str, content: str, lines: list[str], result: CheckResult):
+        """Check export rules (max exported functions per file)."""
+
+        # export.fun only applies to .c files (not headers)
+        if not filepath.endswith('.c'):
+            return
+
+        # Pattern for function definition (not declaration)
+        # Matches: "type name(...) {" or "type name(...) { ... }" (single-line)
+        # Exported = not static
+        func_def_pattern = re.compile(
+            r'^(static\s+)?(?:inline\s+)?'
+            r'(?:const\s+)?(?:unsigned\s+|signed\s+)?'
+            r'(?:void|int|char|short|long|float|double|size_t|ssize_t|'
+            r'struct\s+\w+|union\s+\w+|enum\s+\w+|\w+_t|\w+)'
+            r'(?:\s*\*+|\s+)'
+            r'(\w+)\s*'
+            r'\([^)]*\)\s*\{'
+        )
+
+        exported_functions = []
+        brace_depth = 0
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+
+            # Skip if we're inside a function body
+            if brace_depth > 0:
+                brace_depth += stripped.count('{') - stripped.count('}')
+                continue
+
+            # Skip preprocessor lines
+            if stripped.startswith('#'):
+                continue
+
+            # Skip typedef, struct, union, enum definitions
+            if stripped.startswith(('typedef', 'struct ', 'union ', 'enum ')):
+                if '{' in stripped:
+                    brace_depth += stripped.count('{') - stripped.count('}')
+                continue
+
+            # Check for function definition
+            match = func_def_pattern.match(stripped)
+            if match:
+                is_static = match.group(1) is not None
+                func_name = match.group(2)
+
+                # Only count non-static functions as exported
+                if not is_static:
+                    exported_functions.append((func_name, i + 1))
+
+                # Track brace depth
+                brace_depth += stripped.count('{') - stripped.count('}')
+            else:
+                # Track brace depth for other constructs
+                brace_depth += stripped.count('{') - stripped.count('}')
+
+        # export.fun: Max 10 exported functions per source file
+        if len(exported_functions) > self.max_exported_funcs:
+            func_names = [f[0] for f in exported_functions]
+            result.violations.append(Violation(
+                filepath, 1, 1, "export.fun",
+                f"File has {len(exported_functions)} exported functions "
+                f"(maximum is {self.max_exported_funcs}): {', '.join(func_names)}"
+            ))
+
+        # export.other: Max 1 non-function exported symbol per source file
+        self._check_exported_symbols(filepath, lines, result)
+
+    def _check_exported_symbols(self, filepath: str, lines: list[str], result: CheckResult):
+        """Check for max 1 non-function exported symbol (global variable)."""
+
+        # Pattern for global variable declaration (not function)
+        # Exported = not static
+        global_var_pattern = re.compile(
+            r'^(?!static\b)'  # NOT starting with static
+            r'(?:const\s+)?'
+            r'(?:volatile\s+)?'
+            r'(?:unsigned\s+|signed\s+)?'
+            r'(?:int|char|short|long|float|double|size_t|ssize_t|'
+            r'struct\s+\w+|union\s+\w+|enum\s+\w+|\w+_t)\s*'
+            r'\*?\s*(\w+)\s*[;=\[]'
+        )
+
+        exported_symbols = []
+        brace_depth = 0
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+
+            # Track brace depth
+            brace_depth += stripped.count('{') - stripped.count('}')
+
+            # Only check at file scope (brace_depth == 0)
+            if brace_depth != 0:
+                continue
+
+            # Skip preprocessor, typedef, struct/union/enum definitions
+            if (stripped.startswith('#') or
+                stripped.startswith('typedef') or
+                stripped.startswith('struct ') or
+                stripped.startswith('union ') or
+                stripped.startswith('enum ')):
+                continue
+
+            # Skip function declarations/definitions (have parentheses)
+            if '(' in stripped:
+                continue
+
+            # Skip extern declarations (they don't define the symbol)
+            if stripped.startswith('extern'):
+                continue
+
+            match = global_var_pattern.match(stripped)
+            if match:
+                var_name = match.group(1)
+                exported_symbols.append((var_name, i + 1))
+
+        # export.other: Max 1 non-function exported symbol
+        if len(exported_symbols) > 1:
+            var_names = [f[0] for f in exported_symbols]
+            result.violations.append(Violation(
+                filepath, exported_symbols[1][1], 1, "export.other",
+                f"File has {len(exported_symbols)} exported non-function symbols "
+                f"(maximum is 1): {', '.join(var_names)}"
+            ))
 
     # ========================================================================
     # Naming convention checks
@@ -598,6 +882,10 @@ Rules checked:
   - fun.length      Function body max lines (default: 40)
   - fun.arg.count   Function max arguments (default: 4)
   - fun.proto.void  Empty params should be 'void'
+  - export.fun      Max exported functions per file (default: 10)
+  - export.other    Max 1 non-function exported symbol per file
+  - braces          Braces must be on their own line (Allman style)
+  - braces.indent   4-space indentation, no tabs
   - file.trailing   No trailing whitespace
   - file.dos        No CRLF line endings
   - file.terminate  File must end with newline
@@ -623,6 +911,8 @@ Examples:
                         help='Max lines per function body (default: 40)')
     parser.add_argument('--max-args', type=int, default=4,
                         help='Max arguments per function (default: 4)')
+    parser.add_argument('--max-exported', type=int, default=10,
+                        help='Max exported functions per file (default: 10)')
     parser.add_argument('--no-color', action='store_true',
                         help='Disable colored output')
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -649,12 +939,14 @@ Examples:
     # Run checks
     checker = CodingStyleChecker(
         max_func_lines=args.max_lines,
-        max_func_args=args.max_args
+        max_func_args=args.max_args,
+        max_exported_funcs=args.max_exported
     )
 
     print_header("EPITA C CODING STYLE CHECKER")
-    print(f"  {Colors.DIM}Max function lines: {args.max_lines}{Colors.RESET}")
-    print(f"  {Colors.DIM}Max function args:  {args.max_args}{Colors.RESET}")
+    print(f"  {Colors.DIM}Max function lines:    {args.max_lines}{Colors.RESET}")
+    print(f"  {Colors.DIM}Max function args:     {args.max_args}{Colors.RESET}")
+    print(f"  {Colors.DIM}Max exported funcs:    {args.max_exported}{Colors.RESET}")
     print(f"  {Colors.DIM}Checking {len(files)} file(s)...{Colors.RESET}")
 
     results = []

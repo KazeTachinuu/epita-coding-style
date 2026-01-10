@@ -239,6 +239,139 @@ class TestCppDigraphs:
 
 
 # =============================================================================
+# Export Rules
+# =============================================================================
+
+class TestExportFun:
+    """export.fun: max 10 exported (non-static) functions per .c file."""
+
+    def test_passes_with_10_exported(self, checker, temp_file, valid_10_exported_functions):
+        """Exactly 10 exported functions should pass."""
+        path = temp_file(valid_10_exported_functions)
+        assert not has_violation(checker.check_file(path), "export.fun")
+
+    def test_passes_mixed_static_exported(self, checker, temp_file, valid_mixed_static_exported):
+        """Static functions don't count toward the limit."""
+        path = temp_file(valid_mixed_static_exported)
+        assert not has_violation(checker.check_file(path), "export.fun")
+
+    def test_passes_all_static(self, checker, temp_file, valid_all_static_functions):
+        """All static functions should pass (0 exported)."""
+        path = temp_file(valid_all_static_functions)
+        assert not has_violation(checker.check_file(path), "export.fun")
+
+    def test_fails_with_11_exported(self, checker, temp_file, invalid_11_exported_functions):
+        """11 exported functions should fail."""
+        path = temp_file(invalid_11_exported_functions)
+        assert has_violation(checker.check_file(path), "export.fun")
+
+    def test_fails_with_many_exported(self, checker, temp_file, invalid_many_exported_functions):
+        """15 exported functions should fail."""
+        path = temp_file(invalid_many_exported_functions)
+        assert has_violation(checker.check_file(path), "export.fun")
+
+    def test_header_file_not_checked(self, checker, temp_file, invalid_11_exported_functions):
+        """Header files should NOT be checked for export.fun."""
+        # Use .h suffix - should pass even with 11 functions
+        path = temp_file(invalid_11_exported_functions, suffix=".h", name="many.h")
+        assert not has_violation(checker.check_file(path), "export.fun")
+
+    def test_is_major_severity(self, checker, temp_file, invalid_11_exported_functions):
+        """export.fun violation should be MAJOR severity."""
+        path = temp_file(invalid_11_exported_functions)
+        result = checker.check_file(path)
+        violations = [v for v in result.violations if v.rule == "export.fun"]
+        assert len(violations) > 0
+        assert all(v.severity == Severity.MAJOR for v in violations)
+
+
+class TestExportOther:
+    """export.other: max 1 non-function exported symbol per .c file."""
+
+    def test_passes_with_one_exported_global(self, checker, temp_file, valid_one_exported_global):
+        """One exported global should pass."""
+        path = temp_file(valid_one_exported_global)
+        assert not has_violation(checker.check_file(path), "export.other")
+
+    def test_passes_with_static_globals(self, checker, temp_file, valid_static_globals):
+        """Static globals don't count as exported."""
+        path = temp_file(valid_static_globals)
+        assert not has_violation(checker.check_file(path), "export.other")
+
+    def test_fails_with_two_exported_globals(self, checker, temp_file, invalid_two_exported_globals):
+        """Two exported globals should fail."""
+        path = temp_file(invalid_two_exported_globals)
+        assert has_violation(checker.check_file(path), "export.other")
+
+    def test_fails_with_many_exported_globals(self, checker, temp_file, invalid_many_exported_globals):
+        """Three exported globals should fail."""
+        path = temp_file(invalid_many_exported_globals)
+        assert has_violation(checker.check_file(path), "export.other")
+
+
+# =============================================================================
+# Braces Rules
+# =============================================================================
+
+class TestBraces:
+    """braces: Braces must be on their own line (Allman style)."""
+
+    def test_passes_allman_style(self, checker, temp_file, valid_allman_braces):
+        """Correct Allman style should pass."""
+        path = temp_file(valid_allman_braces)
+        assert not has_violation(checker.check_file(path), "braces")
+
+    def test_passes_initializer_exception(self, checker, temp_file, valid_allman_with_initializer):
+        """Array initializers are an exception."""
+        path = temp_file(valid_allman_with_initializer)
+        assert not has_violation(checker.check_file(path), "braces")
+
+    def test_passes_do_while_exception(self, checker, temp_file, valid_allman_do_while):
+        """do-while } while is an exception."""
+        path = temp_file(valid_allman_do_while)
+        assert not has_violation(checker.check_file(path), "braces")
+
+    def test_fails_kr_function_braces(self, checker, temp_file, invalid_kr_braces):
+        """K&R style function braces should fail."""
+        path = temp_file(invalid_kr_braces)
+        assert has_violation(checker.check_file(path), "braces")
+
+    def test_fails_kr_if_braces(self, checker, temp_file, invalid_kr_if_braces):
+        """K&R style if braces should fail."""
+        path = temp_file(invalid_kr_if_braces)
+        assert has_violation(checker.check_file(path), "braces")
+
+    def test_fails_else_same_line(self, checker, temp_file, invalid_else_same_line):
+        """Else on same line as } should fail."""
+        path = temp_file(invalid_else_same_line)
+        assert has_violation(checker.check_file(path), "braces")
+
+
+class TestBracesIndent:
+    """braces.indent: 4-space indentation, no tabs."""
+
+    def test_passes_4space_indent(self, checker, temp_file, valid_4space_indent):
+        """4-space indentation should pass."""
+        path = temp_file(valid_4space_indent)
+        assert not has_violation(checker.check_file(path), "braces.indent")
+
+    def test_fails_tab_indent(self, checker, temp_file, invalid_tab_indent):
+        """Tab indentation should fail."""
+        path = temp_file(invalid_tab_indent)
+        assert has_violation(checker.check_file(path), "braces.indent")
+
+    def test_fails_2space_indent(self, checker, temp_file, invalid_2space_indent):
+        """2-space indentation should fail."""
+        path = temp_file(invalid_2space_indent)
+        assert has_violation(checker.check_file(path), "braces.indent")
+
+    def test_fails_3space_indent(self, checker, temp_file, invalid_3space_indent):
+        """3-space indentation should fail."""
+        path = temp_file(invalid_3space_indent)
+        assert has_violation(checker.check_file(path), "braces.indent")
+
+
+# =============================================================================
 # Control Rules
 # =============================================================================
 

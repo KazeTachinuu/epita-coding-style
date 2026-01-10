@@ -295,3 +295,228 @@ def invalid_digraph():
 @pytest.fixture
 def invalid_empty_loop():
     return "void f(void) {\n    while (1)\n    ;\n}\n"
+
+
+# =============================================================================
+# Export Rules Fixtures
+# =============================================================================
+
+@pytest.fixture
+def valid_10_exported_functions():
+    """Exactly 10 exported functions - should pass."""
+    funcs = "\n\n".join([f"void func{i}(void) {{ return; }}" for i in range(10)])
+    return funcs + "\n"
+
+
+@pytest.fixture
+def valid_mixed_static_exported():
+    """Mix of static and exported functions - only non-static count."""
+    code = ""
+    # 5 static functions (don't count)
+    for i in range(5):
+        code += f"static void static_func{i}(void) {{ return; }}\n\n"
+    # 10 exported functions (should pass)
+    for i in range(10):
+        code += f"void exported_func{i}(void) {{ return; }}\n\n"
+    return code
+
+
+@pytest.fixture
+def invalid_11_exported_functions():
+    """11 exported functions - should fail."""
+    funcs = "\n\n".join([f"void func{i}(void) {{ return; }}" for i in range(11)])
+    return funcs + "\n"
+
+
+@pytest.fixture
+def invalid_many_exported_functions():
+    """15 exported functions - should fail."""
+    funcs = "\n\n".join([f"int func{i}(int x) {{ return x; }}" for i in range(15)])
+    return funcs + "\n"
+
+
+@pytest.fixture
+def valid_all_static_functions():
+    """All static functions - should pass (0 exported)."""
+    funcs = "\n\n".join([f"static void func{i}(void) {{ return; }}" for i in range(15)])
+    return funcs + "\n"
+
+
+# =============================================================================
+# Export Other Rules Fixtures
+# =============================================================================
+
+@pytest.fixture
+def valid_one_exported_global():
+    """One exported global variable - should pass."""
+    return """int g_counter;
+
+void func(void)
+{
+    g_counter++;
+}
+"""
+
+
+@pytest.fixture
+def valid_static_globals():
+    """Multiple static globals - should pass (not exported)."""
+    return """static int counter1;
+static int counter2;
+static int counter3;
+
+void func(void)
+{
+    counter1++;
+}
+"""
+
+
+@pytest.fixture
+def invalid_two_exported_globals():
+    """Two exported global variables - should fail."""
+    return """int g_counter;
+int g_debug;
+
+void func(void)
+{
+    g_counter++;
+}
+"""
+
+
+@pytest.fixture
+def invalid_many_exported_globals():
+    """Three exported global variables - should fail."""
+    return """int var1;
+int var2;
+int var3;
+
+void func(void)
+{
+    var1++;
+}
+"""
+
+
+# =============================================================================
+# Braces Rules Fixtures
+# =============================================================================
+
+@pytest.fixture
+def valid_allman_braces():
+    """Correct Allman style braces."""
+    return """void func(void)
+{
+    if (x > 0)
+    {
+        return;
+    }
+}
+"""
+
+
+@pytest.fixture
+def valid_allman_with_initializer():
+    """Allman style with array initializer (exception)."""
+    return """int arr[] = { 1, 2, 3 };
+
+void func(void)
+{
+    int x = 0;
+}
+"""
+
+
+@pytest.fixture
+def valid_allman_do_while():
+    """Allman style with do-while (exception for } while)."""
+    return """void func(void)
+{
+    do
+    {
+        x++;
+    } while (x < 10);
+}
+"""
+
+
+@pytest.fixture
+def invalid_kr_braces():
+    """K&R style braces - should fail."""
+    return """void func(void) {
+    return;
+}
+"""
+
+
+@pytest.fixture
+def invalid_kr_if_braces():
+    """K&R style if braces - should fail."""
+    return """void func(void)
+{
+    if (x > 0) {
+        return;
+    }
+}
+"""
+
+
+@pytest.fixture
+def invalid_else_same_line():
+    """Else on same line as closing brace - should fail."""
+    return """void func(void)
+{
+    if (x > 0)
+    {
+        return;
+    } else
+    {
+        x++;
+    }
+}
+"""
+
+
+# =============================================================================
+# Braces Indent Rules Fixtures
+# =============================================================================
+
+@pytest.fixture
+def valid_4space_indent():
+    """Correct 4-space indentation."""
+    return """void func(void)
+{
+    int x = 0;
+    if (x > 0)
+    {
+        return;
+    }
+}
+"""
+
+
+@pytest.fixture
+def invalid_tab_indent():
+    """Tab indentation - should fail."""
+    return "void func(void)\n{\n\tint x = 0;\n}\n"
+
+
+@pytest.fixture
+def invalid_2space_indent():
+    """2-space indentation - should fail."""
+    return """void func(void)
+{
+  int x = 0;
+}
+"""
+
+
+@pytest.fixture
+def invalid_3space_indent():
+    """3-space indentation - should fail."""
+    return """void func(void)
+{
+   int x = 0;
+}
+"""
