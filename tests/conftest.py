@@ -520,3 +520,53 @@ def invalid_3space_indent():
    int x = 0;
 }
 """
+
+
+@pytest.fixture
+def valid_wrapped_condition_and():
+    """Wrapped condition with && at start - should pass."""
+    return """int check(struct Node *tmp_child)
+{
+    if (tmp_child->token->type == THEN
+             && tmp_child->next->token->type == THEN)
+    {
+        return 1;
+    }
+    return 0;
+}
+"""
+
+
+@pytest.fixture
+def valid_wrapped_condition_or():
+    """Wrapped condition with || at start - should pass."""
+    return """int check(int a, int b, int c)
+{
+    if (a > 0
+             || b > 0
+             || c > 0)
+    {
+        return 1;
+    }
+    return 0;
+}
+"""
+
+
+@pytest.fixture
+def valid_wrapped_else_if_condition():
+    """Wrapped else if condition - should pass."""
+    return """int check(struct Node *tmp_child)
+{
+    if (tmp_child == NULL)
+    {
+        return 0;
+    }
+    else if (tmp_child->token->type == THEN
+             && tmp_child->next->token->type == THEN)
+    {
+        return 1;
+    }
+    return 0;
+}
+"""

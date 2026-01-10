@@ -326,6 +326,7 @@ class CodingStyleChecker:
                 if leading_spaces % 4 != 0 and leading_spaces > 0:
                     # Allow continuation lines (might not be multiple of 4)
                     # Heuristic: if previous line ends with operator or comma, it's continuation
+                    # Also check if current line starts with && or || (continuation of condition)
                     if i > 0:
                         prev_stripped = lines[i - 1].strip()
                         # Skip check for continuation lines
@@ -334,6 +335,9 @@ class CodingStyleChecker:
                             prev_stripped.endswith('&&') or
                             prev_stripped.endswith('||') or
                             prev_stripped.endswith('+')):
+                            continue
+                        # Also skip if current line starts with && or || (wrapped condition)
+                        if stripped.startswith('&&') or stripped.startswith('||'):
                             continue
 
                     result.violations.append(Violation(

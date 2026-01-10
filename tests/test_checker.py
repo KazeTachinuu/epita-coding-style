@@ -370,6 +370,21 @@ class TestBracesIndent:
         path = temp_file(invalid_3space_indent)
         assert has_violation(checker.check_file(path), "braces.indent")
 
+    def test_passes_wrapped_condition_and(self, checker, temp_file, valid_wrapped_condition_and):
+        """Wrapped condition starting with && should pass."""
+        path = temp_file(valid_wrapped_condition_and)
+        assert not has_violation(checker.check_file(path), "braces.indent")
+
+    def test_passes_wrapped_condition_or(self, checker, temp_file, valid_wrapped_condition_or):
+        """Wrapped condition starting with || should pass."""
+        path = temp_file(valid_wrapped_condition_or)
+        assert not has_violation(checker.check_file(path), "braces.indent")
+
+    def test_passes_wrapped_else_if_condition(self, checker, temp_file, valid_wrapped_else_if_condition):
+        """Wrapped else if condition should pass."""
+        path = temp_file(valid_wrapped_else_if_condition)
+        assert not has_violation(checker.check_file(path), "braces.indent")
+
 
 # =============================================================================
 # Control Rules
