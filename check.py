@@ -257,7 +257,12 @@ class CodingStyleChecker:
             # braces: Closing brace must be on its own line
             # Exception: do-while: "} while (...)"
             # Exception: else: "} else"  - but in Allman these should be separate
+            # Exception: macro continuation lines (ending with \)
             if '}' in stripped:
+                # Skip macro continuation lines (line ends with backslash)
+                if line.rstrip().endswith('\\'):
+                    continue
+
                 brace_pos = stripped.find('}')
                 after_brace = stripped[brace_pos + 1:].strip()
 
@@ -435,13 +440,23 @@ class CodingStyleChecker:
         if not filepath.endswith('.c'):
             return
 
-        # Pattern for function definition (not declaration)
-        # Matches: "type name(...) {" or "type name(...) { ... }" (single-line)
-        # Exported = not static
-        func_def_pattern = re.compile(
+        # Pattern for function signature (Allman style - brace may be on next line)
+        # Matches: "type name(...)" ending with ) possibly followed by whitespace
+        func_sig_pattern = re.compile(
             r'^(static\s+)?(?:inline\s+)?'
             r'(?:const\s+)?(?:unsigned\s+|signed\s+)?'
-            r'(?:void|int|char|short|long|float|double|size_t|ssize_t|'
+            r'(?:void|int|char|short|long|float|double|size_t|ssize_t|bool|'
+            r'struct\s+\w+|union\s+\w+|enum\s+\w+|\w+_t|\w+)'
+            r'(?:\s*\*+|\s+)'
+            r'(\w+)\s*'
+            r'\([^)]*\)\s*$'
+        )
+
+        # Pattern for function definition with brace on same line (K&R style fallback)
+        func_def_inline_pattern = re.compile(
+            r'^(static\s+)?(?:inline\s+)?'
+            r'(?:const\s+)?(?:unsigned\s+|signed\s+)?'
+            r'(?:void|int|char|short|long|float|double|size_t|ssize_t|bool|'
             r'struct\s+\w+|union\s+\w+|enum\s+\w+|\w+_t|\w+)'
             r'(?:\s*\*+|\s+)'
             r'(\w+)\s*'
@@ -450,6 +465,7 @@ class CodingStyleChecker:
 
         exported_functions = []
         brace_depth = 0
+        pending_function = None  # (is_static, func_name, line_num)
 
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -467,23 +483,44 @@ class CodingStyleChecker:
             if stripped.startswith(('typedef', 'struct ', 'union ', 'enum ')):
                 if '{' in stripped:
                     brace_depth += stripped.count('{') - stripped.count('}')
+                pending_function = None
                 continue
 
-            # Check for function definition
-            match = func_def_pattern.match(stripped)
+            # Check if previous line was a function signature and this line starts with {
+            if pending_function and stripped.startswith('{'):
+                is_static, func_name, line_num = pending_function
+                if not is_static:
+                    exported_functions.append((func_name, line_num))
+                brace_depth += stripped.count('{') - stripped.count('}')
+                pending_function = None
+                continue
+
+            # Clear pending function if we see something else
+            if pending_function and not stripped.startswith('{'):
+                pending_function = None
+
+            # Check for function definition with brace on same line
+            match = func_def_inline_pattern.match(stripped)
             if match:
                 is_static = match.group(1) is not None
                 func_name = match.group(2)
 
-                # Only count non-static functions as exported
                 if not is_static:
                     exported_functions.append((func_name, i + 1))
 
-                # Track brace depth
                 brace_depth += stripped.count('{') - stripped.count('}')
-            else:
-                # Track brace depth for other constructs
-                brace_depth += stripped.count('{') - stripped.count('}')
+                continue
+
+            # Check for function signature (Allman style - brace on next line)
+            match = func_sig_pattern.match(stripped)
+            if match:
+                is_static = match.group(1) is not None
+                func_name = match.group(2)
+                pending_function = (is_static, func_name, i + 1)
+                continue
+
+            # Track brace depth for other constructs
+            brace_depth += stripped.count('{') - stripped.count('}')
 
         # export.fun: Max 10 exported functions per source file
         if len(exported_functions) > self.max_exported_funcs:

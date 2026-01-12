@@ -1,480 +1,55 @@
-"""
-Pytest fixtures for EPITA C Coding Style Checker tests.
-"""
+"""Pytest configuration and shared fixtures."""
 
-import os
 import sys
-import tempfile
+from pathlib import Path
 
 import pytest
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from check import CodingStyleChecker
 
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
-# =============================================================================
-# Checker Fixtures
-# =============================================================================
 
 @pytest.fixture
 def checker():
-    """Default checker (40 lines, 4 args)."""
-    return CodingStyleChecker(max_func_lines=40, max_func_args=4)
+    """Default checker instance."""
+    return CodingStyleChecker(max_func_lines=40, max_func_args=4, max_exported_funcs=10)
 
 
-# =============================================================================
-# File Management
-# =============================================================================
-
-class TempCFile:
-    """Manages temporary C/H files for testing."""
-
-    def __init__(self):
-        self._files = []
-
-    def create(self, content: str, suffix: str = ".c", name: str = None) -> str:
-        # Use binary mode if content contains CRLF to preserve it
-        binary = '\r' in content
-        mode = 'wb' if binary else 'w'
-        data = content.encode() if binary else content
-
-        if name:
-            path = f"/tmp/{name}"
-            with open(path, mode) as f:
-                f.write(data)
+@pytest.fixture
+def check(checker, tmp_path):
+    """Check code string for a rule violation. Returns True if violated."""
+    def _check(code: str, rule: str, suffix: str = ".c") -> bool:
+        path = tmp_path / f"test{suffix}"
+        if '\r' in code:
+            path.write_bytes(code.encode())
         else:
-            fd, path = tempfile.mkstemp(suffix=suffix)
-            with os.fdopen(fd, mode) as f:
-                f.write(data)
-        self._files.append(path)
-        return path
-
-    def cleanup(self):
-        for path in self._files:
-            if os.path.exists(path):
-                os.unlink(path)
+            path.write_text(code)
+        result = checker.check_file(str(path))
+        return any(v.rule == rule for v in result.violations)
+    return _check
 
 
 @pytest.fixture
-def temp_file():
-    """Factory for creating temp files."""
-    manager = TempCFile()
-    yield manager.create
-    manager.cleanup()
-
-
-# =============================================================================
-# Sample Code Fixtures - Valid Code
-# =============================================================================
-
-@pytest.fixture
-def valid_function_4_args():
-    return "int add(int a, int b, int c, int d) { return a+b+c+d; }\n"
+def check_result(checker, tmp_path):
+    """Check code string and return full result."""
+    def _check(code: str, suffix: str = ".c"):
+        path = tmp_path / f"test{suffix}"
+        if '\r' in code:
+            path.write_bytes(code.encode())
+        else:
+            path.write_text(code)
+        return checker.check_file(str(path))
+    return _check
 
 
 @pytest.fixture
-def valid_short_function():
-    return "void f(void) {\n    int x = 1;\n    return;\n}\n"
-
-
-@pytest.fixture
-def valid_function_40_lines():
-    body = "\n".join(["    x++;"] * 37)
-    return f"void f(void)\n{{\n    int x = 0;\n{body}\n    return;\n}}\n"
-
-
-@pytest.fixture
-def valid_function_with_comments():
-    comments = "\n".join(["    // comment"] * 50)
-    return f"void f(void) {{\n    int x = 1;\n{comments}\n    return;\n}}\n"
-
-
-@pytest.fixture
-def valid_function_with_blanks():
-    blanks = "\n" * 50
-    return f"void f(void) {{\n    int x = 1;{blanks}    return;\n}}\n"
-
-
-@pytest.fixture
-def valid_function_with_braces():
-    return """void f(void)
-{
-    if (1)
-    {
-        int x = 1;
-    }
-}
-"""
-
-
-@pytest.fixture
-def valid_single_decl():
-    return "int a;\nint b;\n"
-
-
-@pytest.fixture
-def valid_for_multi_decl():
-    return "void f(void) { for (int i = 0, j = 0; i < 10; i++) {} }\n"
-
-
-@pytest.fixture
-def valid_func_params_multiline():
-    """Function parameters spanning multiple lines should NOT trigger decl.single."""
-    return """static int handle_fi_node(struct Ast_node *tmp_root, struct Ast_node **root,
-                          int *count_if, int *res)
-{
-    return 0;
-}
-"""
-
-
-@pytest.fixture
-def valid_func_params_typed_after_comma():
-    """Function params with type after comma should NOT trigger decl.single."""
-    return "void foo(int a, int b, char c)\n{\n    return;\n}\n"
-
-
-@pytest.fixture
-def valid_fixed_array():
-    return "void f(void) { int arr[10]; }\n"
-
-
-@pytest.fixture
-def valid_macro_size_array():
-    return "#define SIZE 10\nvoid f(void) { int arr[SIZE]; }\n"
-
-
-@pytest.fixture
-def valid_no_trailing():
-    return "int main(void)\n{\n    return 0;\n}\n"
-
-
-@pytest.fixture
-def valid_with_newline():
-    return "int x = 1;\n"
-
-
-@pytest.fixture
-def valid_single_blank():
-    return "int a;\n\nint b;\n"
-
-
-@pytest.fixture
-def valid_big_enum():
-    values = ",\n    ".join([f"VAL_{i}" for i in range(50)])
-    return f"enum big {{\n    {values},\n}};\n"
-
-
-@pytest.fixture
-def valid_big_struct():
-    fields = "\n    ".join([f"int f{i};" for i in range(50)])
-    return f"struct big {{\n    {fields}\n}};\n"
-
-
-@pytest.fixture
-def valid_static_array():
-    values = ", ".join(["0"] * 100)
-    return f"static int arr[] = {{ {values} }};\n"
-
-
-@pytest.fixture
-def valid_typedef_fn_ptr():
-    return "typedef void (*fn)(int, void *);\n"
-
-
-# =============================================================================
-# Sample Code Fixtures - Invalid Code
-# =============================================================================
-
-@pytest.fixture
-def invalid_function_5_args():
-    return "int add(int a, int b, int c, int d, int e) { return 0; }\n"
-
-
-@pytest.fixture
-def invalid_function_41_lines():
-    body = "\n".join(["    x++;"] * 39)
-    return f"void f(void) {{\n    int x = 0;\n{body}\n    return;\n}}\n"
-
-
-@pytest.fixture
-def invalid_multi_decl():
-    return "int a, b;\n"
-
-
-@pytest.fixture
-def invalid_vla():
-    return "void f(int n) { int arr[n]; }\n"
-
-
-@pytest.fixture
-def invalid_trailing_space():
-    return "int main(void)   \n{\n    return 0;\n}\n"
-
-
-@pytest.fixture
-def invalid_no_newline():
-    return "int x = 1;"
-
-
-@pytest.fixture
-def invalid_double_blank():
-    return "int a;\n\n\nint b;\n"
-
-
-@pytest.fixture
-def invalid_blank_at_start():
-    return "\nint x = 1;\n"
-
-
-@pytest.fixture
-def invalid_indented_hash():
-    return "void f(void) {\n    #define X 1\n}\n"
-
-
-# =============================================================================
-# Header File Fixtures
-# =============================================================================
-
-@pytest.fixture
-def valid_header_with_guard():
-    return "#ifndef MY_H\n#define MY_H\nint x;\n#endif /* MY_H */\n"
-
-
-@pytest.fixture
-def valid_header_void_proto():
-    return "#ifndef T_H\n#define T_H\nvoid f(void);\n#endif /* T_H */\n"
-
-
-@pytest.fixture
-def valid_header_endif_comment():
-    return "#ifndef T_H\n#define T_H\n#endif /* T_H */\n"
-
-
-@pytest.fixture
-def invalid_header_no_guard():
-    return "int x;\n"
-
-
-@pytest.fixture
-def invalid_header_empty_proto():
-    return "#ifndef T_H\n#define T_H\nvoid f();\n#endif /* T_H */\n"
-
-
-@pytest.fixture
-def invalid_header_no_endif_comment():
-    return "#ifndef T_H\n#define T_H\n#endif\n"
-
-
-# =============================================================================
-# Additional Invalid Code Fixtures
-# =============================================================================
-
-@pytest.fixture
-def invalid_crlf():
-    return "int x = 1;\r\nint y = 2;\r\n"
-
-
-@pytest.fixture
-def invalid_blank_at_end():
-    return "int x = 1;\n\n"
-
-
-@pytest.fixture
-def invalid_asm():
-    return "void f(void) {\n    asm(\"nop\");\n}\n"
-
-
-@pytest.fixture
-def invalid_digraph():
-    return "int arr<:10:> = {0};\n"
-
-
-@pytest.fixture
-def invalid_empty_loop():
-    return "void f(void) {\n    while (1)\n    ;\n}\n"
-
-
-# =============================================================================
-# Export Rules Fixtures
-# =============================================================================
-
-@pytest.fixture
-def valid_10_exported_functions():
-    """Exactly 10 exported functions - should pass."""
-    funcs = "\n\n".join([f"void func{i}(void) {{ return; }}" for i in range(10)])
-    return funcs + "\n"
-
-
-@pytest.fixture
-def valid_mixed_static_exported():
-    """Mix of static and exported functions - only non-static count."""
-    code = ""
-    # 5 static functions (don't count)
-    for i in range(5):
-        code += f"static void static_func{i}(void) {{ return; }}\n\n"
-    # 10 exported functions (should pass)
-    for i in range(10):
-        code += f"void exported_func{i}(void) {{ return; }}\n\n"
-    return code
-
-
-@pytest.fixture
-def invalid_11_exported_functions():
-    """11 exported functions - should fail."""
-    funcs = "\n\n".join([f"void func{i}(void) {{ return; }}" for i in range(11)])
-    return funcs + "\n"
-
-
-@pytest.fixture
-def invalid_many_exported_functions():
-    """15 exported functions - should fail."""
-    funcs = "\n\n".join([f"int func{i}(int x) {{ return x; }}" for i in range(15)])
-    return funcs + "\n"
-
-
-@pytest.fixture
-def valid_all_static_functions():
-    """All static functions - should pass (0 exported)."""
-    funcs = "\n\n".join([f"static void func{i}(void) {{ return; }}" for i in range(15)])
-    return funcs + "\n"
-
-
-# =============================================================================
-# Export Other Rules Fixtures
-# =============================================================================
-
-@pytest.fixture
-def valid_one_exported_global():
-    """One exported global variable - should pass."""
-    return """int g_counter;
-
-void func(void)
-{
-    g_counter++;
-}
-"""
-
-
-@pytest.fixture
-def valid_static_globals():
-    """Multiple static globals - should pass (not exported)."""
-    return """static int counter1;
-static int counter2;
-static int counter3;
-
-void func(void)
-{
-    counter1++;
-}
-"""
-
-
-@pytest.fixture
-def invalid_two_exported_globals():
-    """Two exported global variables - should fail."""
-    return """int g_counter;
-int g_debug;
-
-void func(void)
-{
-    g_counter++;
-}
-"""
-
-
-@pytest.fixture
-def invalid_many_exported_globals():
-    """Three exported global variables - should fail."""
-    return """int var1;
-int var2;
-int var3;
-
-void func(void)
-{
-    var1++;
-}
-"""
-
-
-# =============================================================================
-# Braces Rules Fixtures
-# =============================================================================
-
-@pytest.fixture
-def valid_allman_braces():
-    """Correct Allman style braces."""
-    return """void func(void)
-{
-    if (x > 0)
-    {
-        return;
-    }
-}
-"""
-
-
-@pytest.fixture
-def valid_allman_with_initializer():
-    """Allman style with array initializer (exception)."""
-    return """int arr[] = { 1, 2, 3 };
-
-void func(void)
-{
-    int x = 0;
-}
-"""
-
-
-@pytest.fixture
-def valid_allman_do_while():
-    """Allman style with do-while (exception for } while)."""
-    return """void func(void)
-{
-    do
-    {
-        x++;
-    } while (x < 10);
-}
-"""
-
-
-@pytest.fixture
-def invalid_kr_braces():
-    """K&R style braces - should fail."""
-    return """void func(void) {
-    return;
-}
-"""
-
-
-@pytest.fixture
-def invalid_kr_if_braces():
-    """K&R style if braces - should fail."""
-    return """void func(void)
-{
-    if (x > 0) {
-        return;
-    }
-}
-"""
-
-
-@pytest.fixture
-def invalid_else_same_line():
-    """Else on same line as closing brace - should fail."""
-    return """void func(void)
-{
-    if (x > 0)
-    {
-        return;
-    } else
-    {
-        x++;
-    }
-}
-"""
-
-
+def check_fixture(checker):
+    """Check a fixture file for a rule violation."""
+    def _check(filename: str, rule: str) -> bool:
+        path = FIXTURES_DIR / filename
+        result = checker.check_file(str(path))
+        return any(v.rule == rule for v in result.violations)
+    return _check
