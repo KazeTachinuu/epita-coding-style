@@ -347,45 +347,6 @@ class TestBraces:
         assert has_violation(checker.check_file(path), "braces")
 
 
-class TestBracesIndent:
-    """braces.indent: 4-space indentation, no tabs."""
-
-    def test_passes_4space_indent(self, checker, temp_file, valid_4space_indent):
-        """4-space indentation should pass."""
-        path = temp_file(valid_4space_indent)
-        assert not has_violation(checker.check_file(path), "braces.indent")
-
-    def test_fails_tab_indent(self, checker, temp_file, invalid_tab_indent):
-        """Tab indentation should fail."""
-        path = temp_file(invalid_tab_indent)
-        assert has_violation(checker.check_file(path), "braces.indent")
-
-    def test_fails_2space_indent(self, checker, temp_file, invalid_2space_indent):
-        """2-space indentation should fail."""
-        path = temp_file(invalid_2space_indent)
-        assert has_violation(checker.check_file(path), "braces.indent")
-
-    def test_fails_3space_indent(self, checker, temp_file, invalid_3space_indent):
-        """3-space indentation should fail."""
-        path = temp_file(invalid_3space_indent)
-        assert has_violation(checker.check_file(path), "braces.indent")
-
-    def test_passes_wrapped_condition_and(self, checker, temp_file, valid_wrapped_condition_and):
-        """Wrapped condition starting with && should pass."""
-        path = temp_file(valid_wrapped_condition_and)
-        assert not has_violation(checker.check_file(path), "braces.indent")
-
-    def test_passes_wrapped_condition_or(self, checker, temp_file, valid_wrapped_condition_or):
-        """Wrapped condition starting with || should pass."""
-        path = temp_file(valid_wrapped_condition_or)
-        assert not has_violation(checker.check_file(path), "braces.indent")
-
-    def test_passes_wrapped_else_if_condition(self, checker, temp_file, valid_wrapped_else_if_condition):
-        """Wrapped else if condition should pass."""
-        path = temp_file(valid_wrapped_else_if_condition)
-        assert not has_violation(checker.check_file(path), "braces.indent")
-
-
 # =============================================================================
 # Control Rules
 # =============================================================================

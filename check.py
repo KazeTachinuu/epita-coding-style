@@ -194,11 +194,11 @@ class CodingStyleChecker:
                 ))
 
     # ========================================================================
-    # Braces and indentation checks
+    # Braces checks
     # ========================================================================
 
     def _check_braces_rules(self, filepath: str, content: str, lines: list[str], result: CheckResult):
-        """Check braces rules (Allman style, 4-space indentation, no tabs)."""
+        """Check braces rules (Allman style)."""
 
         # Track context to avoid false positives
         in_string = False
@@ -206,14 +206,6 @@ class CodingStyleChecker:
         in_multiline_comment = False
 
         for i, line in enumerate(lines):
-            # Check for tabs (braces.indent: no tabs allowed)
-            if '\t' in line:
-                col = line.index('\t') + 1
-                result.violations.append(Violation(
-                    filepath, i + 1, col, "braces.indent",
-                    "Tabs not allowed, use 4 spaces for indentation"
-                ))
-
             stripped = line.strip()
 
             # Skip empty lines
@@ -285,65 +277,6 @@ class CodingStyleChecker:
                     result.violations.append(Violation(
                         filepath, i + 1, brace_pos + 1, "braces",
                         "Closing brace must be on its own line (Allman style)"
-                    ))
-
-        # braces.indent: Check 4-space indentation
-        self._check_indentation(filepath, lines, result)
-
-    def _check_indentation(self, filepath: str, lines: list[str], result: CheckResult):
-        """Check that indentation uses 4 spaces per level."""
-        expected_indent = 0
-        in_multiline_comment = False
-
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-
-            # Skip empty lines
-            if not stripped:
-                continue
-
-            # Track multiline comments
-            if '/*' in line and '*/' not in line:
-                in_multiline_comment = True
-            if in_multiline_comment:
-                if '*/' in line:
-                    in_multiline_comment = False
-                continue
-
-            # Skip preprocessor (always at column 0)
-            if stripped.startswith('#'):
-                continue
-
-            # Calculate leading spaces
-            leading_spaces = len(line) - len(line.lstrip(' \t'))
-
-            # Adjust expected indent based on braces
-            # Decrease indent for closing braces before checking
-            if stripped.startswith('}') or stripped.startswith('case ') or stripped.startswith('default:'):
-                pass  # These can be at various indent levels
-            else:
-                # Check if indentation is a multiple of 4
-                if leading_spaces % 4 != 0 and leading_spaces > 0:
-                    # Allow continuation lines (might not be multiple of 4)
-                    # Heuristic: if previous line ends with operator or comma, it's continuation
-                    # Also check if current line starts with && or || (continuation of condition)
-                    if i > 0:
-                        prev_stripped = lines[i - 1].strip()
-                        # Skip check for continuation lines
-                        if (prev_stripped.endswith(',') or
-                            prev_stripped.endswith('(') or
-                            prev_stripped.endswith('&&') or
-                            prev_stripped.endswith('||') or
-                            prev_stripped.endswith('+')):
-                            continue
-                        # Also skip if current line starts with && or || (wrapped condition)
-                        if stripped.startswith('&&') or stripped.startswith('||'):
-                            continue
-
-                    result.violations.append(Violation(
-                        filepath, i + 1, 1, "braces.indent",
-                        f"Indentation must be a multiple of 4 spaces (found {leading_spaces})",
-                        Severity.MINOR
                     ))
 
     # ========================================================================
@@ -889,7 +822,6 @@ Rules checked:
   - export.fun      Max exported functions per file (default: 10)
   - export.other    Max 1 non-function exported symbol per file
   - braces          Braces must be on their own line (Allman style)
-  - braces.indent   4-space indentation, no tabs
   - file.trailing   No trailing whitespace
   - file.dos        No CRLF line endings
   - file.terminate  File must end with newline
