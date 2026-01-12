@@ -4,8 +4,13 @@ import pytest
 from check import Severity
 
 
-def _make_exported_funcs(n, allman=False):
-    """Generate n exported functions (K&R or Allman style)."""
+def _make_exported_funcs(n, allman=False, multiline_params=False):
+    """Generate n exported functions (K&R, Allman, or multi-line params)."""
+    if multiline_params:
+        return "\n".join(
+            f"int func{i}(int a,\n           int b)\n{{\n    return {i};\n}}"
+            for i in range(n)
+        ) + "\n"
     if allman:
         return "\n".join(f"int func{i}(void)\n{{\n    return {i};\n}}" for i in range(n)) + "\n"
     return "\n".join(f"int func{i}(void) {{ return {i}; }}" for i in range(n)) + "\n"
@@ -32,6 +37,15 @@ def test_export_fun(check, code, should_fail):
     (_make_exported_funcs(11, allman=True), True),
 ])
 def test_export_fun_allman(check, code, should_fail):
+    assert check(code, "export.fun") == should_fail
+
+
+# export.fun: Multi-line parameters
+@pytest.mark.parametrize("code,should_fail", [
+    (_make_exported_funcs(10, multiline_params=True), False),
+    (_make_exported_funcs(11, multiline_params=True), True),
+])
+def test_export_fun_multiline_params(check, code, should_fail):
     assert check(code, "export.fun") == should_fail
 
 
