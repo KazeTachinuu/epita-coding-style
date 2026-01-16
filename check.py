@@ -200,6 +200,9 @@ class CodingStyleChecker:
     def _check_braces_rules(self, filepath: str, content: str, lines: list[str], result: CheckResult):
         """Check braces rules (Allman style)."""
 
+        # Pattern to match character literals like '{', '}', '(', '\n', '\\'', etc.
+        char_literal_pattern = re.compile(r"'(?:\\.|[^'\\])'")
+
         # Track context to avoid false positives
         in_string = False
         in_comment = False
@@ -233,22 +236,31 @@ class CodingStyleChecker:
             # Exception: array/struct initializers like "int arr[] = { 1, 2 };"
             # Exception: do-while: "} while"
             if '{' in stripped:
-                # Check if brace is NOT alone or at start of line
-                brace_pos = stripped.find('{')
-                before_brace = stripped[:brace_pos].strip()
+                # Remove character literals to avoid false positives with '{'
+                stripped_no_chars = char_literal_pattern.sub("   ", stripped)
 
-                # Skip initializers (has '=' before brace)
-                if '=' in before_brace:
+                if '{' not in stripped_no_chars:
                     continue
 
+                # Check if brace is NOT alone or at start of line
+                brace_pos = stripped_no_chars.find('{')
+                before_brace = stripped_no_chars[:brace_pos].strip()
+
+                # Skip initializers (has assignment '=' before brace, not == != <= >=)
+                if '=' in before_brace:
+                    # Check it's an assignment, not a comparison operator
+                    temp = before_brace.replace('==', '').replace('!=', '').replace('<=', '').replace('>=', '')
+                    if '=' in temp:
+                        continue
+
                 # Skip empty braces on same line like "{ }"
-                if stripped == '{}' or stripped == '{ }':
+                if stripped_no_chars.strip() in ['{}', '{ }']:
                     continue
 
                 # If there's code before the brace (not just whitespace), it's K&R style
                 if before_brace and before_brace not in ['do']:
-                    # Check it's not a string containing brace
-                    if '"' not in before_brace and "'" not in before_brace:
+                    # Check it's not a string literal containing brace
+                    if '"' not in before_brace:
                         result.violations.append(Violation(
                             filepath, i + 1, brace_pos + 1, "braces",
                             "Opening brace must be on its own line (Allman style)"
@@ -263,8 +275,14 @@ class CodingStyleChecker:
                 if line.rstrip().endswith('\\'):
                     continue
 
-                brace_pos = stripped.find('}')
-                after_brace = stripped[brace_pos + 1:].strip()
+                # Remove character literals to avoid false positives with '}'
+                stripped_no_chars = char_literal_pattern.sub("   ", stripped)
+
+                if '}' not in stripped_no_chars:
+                    continue
+
+                brace_pos = stripped_no_chars.find('}')
+                after_brace = stripped_no_chars[brace_pos + 1:].strip()
 
                 # "} while" is allowed for do-while
                 if after_brace.startswith('while'):

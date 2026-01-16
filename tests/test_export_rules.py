@@ -64,6 +64,81 @@ def test_export_fun_is_major(check_result):
     assert all(v.severity == Severity.MAJOR for v in violations)
 
 
+# Character literals with parens/braces should not throw off function counting
+CODE_CHAR_LITERAL_PARENS = """\
+int func1(void)
+{
+    if (c == '(')
+        return 1;
+    return 0;
+}
+int func2(void)
+{
+    if (c == ')')
+        return 1;
+    return 0;
+}
+"""
+
+CODE_CHAR_LITERAL_BRACES_IN_FUNC = """\
+int func1(void)
+{
+    if (c == '{')
+        return 1;
+    return 0;
+}
+int func2(void)
+{
+    if (c == '}')
+        return 1;
+    return 0;
+}
+"""
+
+
+def test_export_fun_char_literal_parens(check_result):
+    """Parenthesis in char literals like '(' or ')' should not affect function counting."""
+    result = check_result(CODE_CHAR_LITERAL_PARENS)
+    # Should detect exactly 2 exported functions, not be confused by '(' and ')'
+    export_violations = [v for v in result.violations if v.rule == "export.fun"]
+    assert len(export_violations) == 0  # 2 functions is under the limit of 10
+
+
+def test_export_fun_char_literal_braces(check_result):
+    """Braces in char literals like '{' or '}' should not affect function counting."""
+    result = check_result(CODE_CHAR_LITERAL_BRACES_IN_FUNC)
+    # Should detect exactly 2 exported functions, not be confused by '{' and '}'
+    export_violations = [v for v in result.violations if v.rule == "export.fun"]
+    assert len(export_violations) == 0  # 2 functions is under the limit of 10
+
+
+# Edge case: brace char literal that could confuse brace depth tracking
+CODE_11_FUNCS_WITH_BRACE_CHAR = """\
+int f1(void) { return 0; }
+int f2(void) { return 0; }
+int f3(void) { return 0; }
+int f4(void) { return 0; }
+int f5(void) { return 0; }
+int f6(void) { return 0; }
+int f7(void) { return 0; }
+int f8(void) { return 0; }
+int f9(void) { return 0; }
+int f10(void) { return 0; }
+int f11(void)
+{
+    if (c == '}')
+        return 1;
+    return 0;
+}
+"""
+
+
+def test_export_fun_brace_char_depth_tracking(check):
+    """11 functions with '}' char literal - should still count as 11 exported functions."""
+    # This should trigger export.fun violation (> 10 exported functions)
+    assert check(CODE_11_FUNCS_WITH_BRACE_CHAR, "export.fun") == True
+
+
 # export.other: max 1 non-function exported symbol per .c file
 @pytest.mark.parametrize("code,should_fail", [
     ("int global_var;\n", False),
