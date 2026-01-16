@@ -81,6 +81,97 @@ class CheckResult:
 
 
 # ============================================================================
+# Helper functions for safe parsing
+# ============================================================================
+
+def _strip_strings_and_chars(line: str) -> str:
+    """Remove string literals and char literals from a line, replacing with spaces.
+
+    This prevents false positives from braces/parens inside literals like:
+    - char c = '{';
+    - char *s = "{ hello }";
+    """
+    result = []
+    i = 0
+    while i < len(line):
+        # Character literal
+        if line[i] == "'" and (i == 0 or line[i-1] != '\\'):
+            result.append(' ')
+            i += 1
+            while i < len(line):
+                if line[i] == '\\' and i + 1 < len(line):
+                    result.append('  ')
+                    i += 2
+                elif line[i] == "'":
+                    result.append(' ')
+                    i += 1
+                    break
+                else:
+                    result.append(' ')
+                    i += 1
+        # String literal
+        elif line[i] == '"' and (i == 0 or line[i-1] != '\\'):
+            result.append(' ')
+            i += 1
+            while i < len(line):
+                if line[i] == '\\' and i + 1 < len(line):
+                    result.append('  ')
+                    i += 2
+                elif line[i] == '"':
+                    result.append(' ')
+                    i += 1
+                    break
+                else:
+                    result.append(' ')
+                    i += 1
+        else:
+            result.append(line[i])
+            i += 1
+    return ''.join(result)
+
+
+def _strip_comments_from_line(line: str, in_block_comment: bool) -> tuple[str, bool]:
+    """Remove comments from a line, returning cleaned line and block comment state.
+
+    Handles // line comments and /* block comments */.
+    """
+    result = []
+    i = 0
+
+    while i < len(line):
+        if in_block_comment:
+            if i + 1 < len(line) and line[i:i+2] == '*/':
+                result.append('  ')
+                i += 2
+                in_block_comment = False
+            else:
+                result.append(' ')
+                i += 1
+        elif i + 1 < len(line) and line[i:i+2] == '//':
+            result.append(' ' * (len(line) - i))
+            break
+        elif i + 1 < len(line) and line[i:i+2] == '/*':
+            result.append('  ')
+            i += 2
+            in_block_comment = True
+        else:
+            result.append(line[i])
+            i += 1
+
+    return ''.join(result), in_block_comment
+
+
+def _clean_line_for_parsing(line: str, in_block_comment: bool) -> tuple[str, bool]:
+    """Remove strings, char literals, and comments from a line for safe parsing.
+
+    Returns the cleaned line and the updated block comment state.
+    """
+    line, in_block_comment = _strip_comments_from_line(line, in_block_comment)
+    line = _strip_strings_and_chars(line)
+    return line, in_block_comment
+
+
+# ============================================================================
 # Main checker class
 # ============================================================================
 
@@ -550,35 +641,55 @@ class CodingStyleChecker:
 
         # Pattern for global variable declaration (not function)
         # Exported = not static
+        # This pattern handles:
+        # - Basic types: int, char, short, long, float, double, void
+        # - Compound types: long long, unsigned long long, etc.
+        # - Fixed-width types: int8_t, uint64_t, size_t, etc.
+        # - Bool: _Bool
+        # - Struct/union/enum: struct foo, union bar, enum baz
+        # - Custom types: MyStruct, MyType (any identifier)
+        # - Pointers: *, **, ***
+        # - Arrays: [N], []
         global_var_pattern = re.compile(
-            r'^(?!static\b)'  # NOT starting with static
+            r'^(?!static\b)(?!extern\b)(?!typedef\b)'  # NOT static/extern/typedef
             r'(?:const\s+)?'
             r'(?:volatile\s+)?'
-            r'(?:unsigned\s+|signed\s+)?'
-            r'(?:int|char|short|long|float|double|size_t|ssize_t|'
-            r'struct\s+\w+|union\s+\w+|enum\s+\w+|\w+_t)\s*'
-            r'\*?\s*(\w+)\s*[;=\[]'
+            r'(?:(?:unsigned|signed)\s+)?'
+            r'(?:(?:long|short)\s+)*'  # Handle "long long", "short int", etc.
+            r'(?:int|char|short|long|float|double|void|_Bool|'
+            r'struct\s+\w+|union\s+\w+|enum\s+\w+|'
+            r'[a-zA-Z_]\w*)\s*'  # Any type including custom types
+            r'(\*+\s*)*'  # Multiple pointer levels
+            r'(\w+)\s*'  # Variable name (capture group)
+            r'(?:[;=\[])'  # Ends with ; or = or [
         )
 
         exported_symbols = []
         brace_depth = 0
+        in_block_comment = False
 
         for i, line in enumerate(lines):
-            stripped = line.strip()
+            # Clean line: remove strings, char literals, and comments
+            # This prevents '{' in char literals from confusing brace depth
+            cleaned_line, in_block_comment = _clean_line_for_parsing(line, in_block_comment)
+            stripped = cleaned_line.strip()
 
-            # Track brace depth
+            # Track brace depth using cleaned line
             brace_depth += stripped.count('{') - stripped.count('}')
 
             # Only check at file scope (brace_depth == 0)
             if brace_depth != 0:
                 continue
 
+            # Use original line for pattern matching (to get correct variable names)
+            orig_stripped = line.strip()
+
             # Skip preprocessor, typedef, struct/union/enum definitions
-            if (stripped.startswith('#') or
-                stripped.startswith('typedef') or
-                stripped.startswith('struct ') or
-                stripped.startswith('union ') or
-                stripped.startswith('enum ')):
+            if (orig_stripped.startswith('#') or
+                orig_stripped.startswith('typedef') or
+                orig_stripped.startswith('struct ') or
+                orig_stripped.startswith('union ') or
+                orig_stripped.startswith('enum ')):
                 continue
 
             # Skip function declarations/definitions (have parentheses)
@@ -586,13 +697,19 @@ class CodingStyleChecker:
                 continue
 
             # Skip extern declarations (they don't define the symbol)
-            if stripped.startswith('extern'):
+            if orig_stripped.startswith('extern'):
                 continue
 
-            match = global_var_pattern.match(stripped)
+            # Skip static declarations (not exported)
+            if orig_stripped.startswith('static') or ' static ' in orig_stripped:
+                continue
+
+            match = global_var_pattern.match(orig_stripped)
             if match:
-                var_name = match.group(1)
-                exported_symbols.append((var_name, i + 1))
+                # Variable name is in the last captured group
+                var_name = match.group(2) if match.group(2) else match.group(1)
+                if var_name:
+                    exported_symbols.append((var_name, i + 1))
 
         # export.other: Max 1 non-function exported symbol
         if len(exported_symbols) > 1:
