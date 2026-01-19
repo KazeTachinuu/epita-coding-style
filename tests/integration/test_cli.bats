@@ -94,6 +94,43 @@ int main(void){
     return 0;
 }
 EOF
+
+    # Too many exported functions (11 functions, exceeds 10 limit)
+    cat > "$TMP_DIR/bad_funcs.c" << 'EOF'
+void f1(void)
+{
+}
+void f2(void)
+{
+}
+void f3(void)
+{
+}
+void f4(void)
+{
+}
+void f5(void)
+{
+}
+void f6(void)
+{
+}
+void f7(void)
+{
+}
+void f8(void)
+{
+}
+void f9(void)
+{
+}
+void f10(void)
+{
+}
+void f11(void)
+{
+}
+EOF
 }
 
 teardown() {
@@ -189,6 +226,17 @@ teardown() {
 
 @test "--max-args override" {
     run uv run epita-coding-style --max-args 10 "$TMP_DIR/bad_args.c"
+    [ "$status" -eq 0 ]
+}
+
+@test "export.fun detected (>10 functions)" {
+    run uv run epita-coding-style "$TMP_DIR/bad_funcs.c"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"export.fun"* ]]
+}
+
+@test "--max-funcs override" {
+    run uv run epita-coding-style --max-funcs 15 "$TMP_DIR/bad_funcs.c"
     [ "$status" -eq 0 ]
 }
 

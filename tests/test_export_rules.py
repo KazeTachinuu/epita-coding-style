@@ -14,6 +14,19 @@ def _make_funcs(n, static=False):
     ) + "\n"
 
 
+def _make_mixed_funcs(n_exported, n_static):
+    """Generate a mix of exported and static functions."""
+    exported = "\n".join(
+        f"int exported{i}(void)\n{{\n    return {i};\n}}"
+        for i in range(n_exported)
+    )
+    static = "\n".join(
+        f"static int static{i}(void)\n{{\n    return {i};\n}}"
+        for i in range(n_static)
+    )
+    return exported + "\n" + static + "\n"
+
+
 def _make_multiline_funcs(n):
     """Generate n functions with multi-line signatures."""
     return "\n".join(
@@ -32,6 +45,8 @@ def _make_multiline_funcs(n):
     (_make_funcs(15, static=True), False),
     (_make_multiline_funcs(10), False),
     (_make_multiline_funcs(11), True),
+    (_make_mixed_funcs(10, 5), False),  # 10 exported + 5 static = OK
+    (_make_mixed_funcs(11, 5), True),   # 11 exported + 5 static = fail
 ])
 def test_export_fun(check, code, should_fail):
     assert check(code, "export.fun") == should_fail
