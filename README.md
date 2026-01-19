@@ -1,52 +1,88 @@
 # EPITA C Coding Style Checker
 
-A Python script to check C code against EPITA coding style rules.
+A fast C code linter that validates against EPITA coding style rules. Uses [tree-sitter](https://tree-sitter.github.io/) for robust parsing.
+
+## Installation
+
+```bash
+pipx install epita-coding-style
+```
+
+Or with pip:
+```bash
+pip install epita-coding-style
+```
 
 ## Usage
 
 ```bash
-# Check current directory (recursive)
-./check.py
+# Check current directory
+coding-style-check
 
 # Check specific files or directories
-./check.py src/
-./check.py main.c utils.h
+coding-style-check src/
+coding-style-check main.c utils.h
 
 # Options
-./check.py --help
-./check.py --max-lines 30    # Custom max function lines
-./check.py --no-color        # Disable colored output
-./check.py -q                # Quiet mode (summary only)
+coding-style-check --help
+coding-style-check --max-lines 30    # Custom max function lines
+coding-style-check --max-args 5      # Custom max function args
+coding-style-check --no-color        # Disable colored output
+coding-style-check -q                # Quiet mode (summary only)
 ```
 
 ## Rules Checked
 
-- `fun.length` - Max 40 lines per function body
-- `fun.arg.count` - Max 4 arguments per function
-- `fun.proto.void` - Empty params should use `void`
-- `decl.single` - One declaration per line
-- `decl.vla` - No variable-length arrays
-- `file.trailing` - No trailing whitespace
-- `file.dos` - No CRLF line endings
-- `file.terminate` - File must end with newline
-- `file.spurious` - No blank lines at start/end
-- `lines.empty` - No consecutive empty lines
-- `cpp.guard` - Header files need include guards
-- `cpp.mark` - Preprocessor `#` on first column
-- `cpp.if` - `#endif` needs comment
-- `cpp.digraphs` - No digraphs/trigraphs
-- `stat.asm` - No asm declarations
-- `ctrl.empty` - Empty loops should use `continue`
+| Rule | Description |
+|------|-------------|
+| `fun.length` | Max 40 lines per function body |
+| `fun.arg.count` | Max 4 arguments per function |
+| `fun.proto.void` | Empty params should use `void` |
+| `export.fun` | Max 10 exported functions per file |
+| `export.other` | Max 1 exported global variable |
+| `braces` | Allman brace style (braces on own line) |
+| `decl.single` | One declaration per line |
+| `decl.vla` | No variable-length arrays |
+| `file.trailing` | No trailing whitespace |
+| `file.dos` | No CRLF line endings |
+| `file.terminate` | File must end with newline |
+| `file.spurious` | No blank lines at start/end |
+| `lines.empty` | No consecutive empty lines |
+| `cpp.guard` | Header files need include guards |
+| `cpp.mark` | Preprocessor `#` on first column |
+| `cpp.if` | `#endif` needs comment |
+| `cpp.digraphs` | No digraphs/trigraphs |
+| `stat.asm` | No asm declarations |
+| `ctrl.empty` | Empty loops should use `continue` |
+
+## Example Output
+
+```
+src/parser.c
+  42: [MAJOR] fun.arg.count: 'parse_node' has 5 args (max 4)
+  156: [MAJOR] fun.length: Function has 45 lines (max 40)
+
+src/utils.c
+  12: [MINOR] file.trailing: Trailing whitespace
+
+Files: 2  Major: 2  Minor: 1
+```
 
 ## Development
 
 ```bash
-# Setup
+# Clone and setup
+git clone https://github.com/KazeTachinuu/coding-style
+cd coding-style
 uv sync --dev
 
 # Run tests
 uv run pytest
 
-# Run tests with coverage
-uv run pytest --cov=check
+# Build
+python -m build
 ```
+
+## License
+
+MIT

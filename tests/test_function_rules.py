@@ -1,7 +1,7 @@
 """Tests for function-level rules."""
 
 import pytest
-from check import Severity
+from epita_coding_style import Severity
 
 
 # fun.arg.count: max 4 arguments
@@ -14,10 +14,35 @@ def test_arg_count(check, code, should_fail):
     assert check(code, "fun.arg.count") == should_fail
 
 
+# fun.arg.count with multi-line signatures
+def test_arg_count_multiline(check):
+    """Test that argument count is correctly detected in multi-line function signatures."""
+    code = """void handle_unquoted(char **p, struct Ast_node *ast,
+                     struct Ast_node **current_cmd,
+                     struct Ast_node *merge_target, int *is_first,
+                     int *force_new)
+{
+    return;
+}
+"""
+    # This function has 6 arguments, should fail
+    assert check(code, "fun.arg.count") == True
+
+
+def test_arg_count_multiline_ok(check):
+    """Test multi-line signature with 4 args passes."""
+    code = """void foo(int a, int b,
+             int c, int d)
+{
+    return;
+}
+"""
+    assert check(code, "fun.arg.count") == False
+
+
 def test_arg_count_is_major(check_result):
     code = "int f(int a, int b, int c, int d, int e) { return 0; }\n"
-    result = check_result(code)
-    violations = [v for v in result.violations if v.rule == "fun.arg.count"]
+    violations = [v for v in check_result(code) if v.rule == "fun.arg.count"]
     assert all(v.severity == Severity.MAJOR for v in violations)
 
 

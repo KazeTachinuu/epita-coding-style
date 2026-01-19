@@ -1,28 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "coding-style-checker"
-version = "1.0.0"
-description = "EPITA C Coding Style Checker"
+name = "epita-coding-style"
+version = "2.0.0"
+description = "EPITA C Coding Style Checker - validates C code against EPITA coding standards"
+readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+license = "MIT"
+authors = [
+    { name = "Hugo" }
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C",
+    "Topic :: Software Development :: Quality Assurance",
+]
+keywords = ["c", "coding-style", "linter", "epita", "checker"]
+dependencies = [
+    "tree-sitter>=0.23.0",
+    "tree-sitter-c>=0.23.0",
+]
+
+[project.scripts]
+coding-style-check = "epita_coding_style:main"
+
+[project.urls]
+Homepage = "https://github.com/KazeTachinuu/coding-style"
+Repository = "https://github.com/KazeTachinuu/coding-style"
+Issues = "https://github.com/KazeTachinuu/coding-style/issues"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
-    "pytest-cov>=4.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/epita_coding_style"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/README.md",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v"
-
-[tool.coverage.run]
-source = ["."]
-omit = ["tests/*", "**/__pycache__/*"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "if __name__ == .__main__.:",
-]

@@ -1,7 +1,7 @@
 """Tests for export rules."""
 
 import pytest
-from check import Severity
+from epita_coding_style import Severity
 
 
 def _make_exported_funcs(n, allman=False, multiline_params=False):
@@ -59,7 +59,7 @@ def test_export_fun_is_major(check_result):
     """export.fun violations should be MAJOR severity."""
     code = _make_exported_funcs(11)
     result = check_result(code)
-    violations = [v for v in result.violations if v.rule == "export.fun"]
+    violations = [v for v in result if v.rule == "export.fun"]
     assert len(violations) > 0
     assert all(v.severity == Severity.MAJOR for v in violations)
 
@@ -100,7 +100,7 @@ def test_export_fun_char_literal_parens(check_result):
     """Parenthesis in char literals like '(' or ')' should not affect function counting."""
     result = check_result(CODE_CHAR_LITERAL_PARENS)
     # Should detect exactly 2 exported functions, not be confused by '(' and ')'
-    export_violations = [v for v in result.violations if v.rule == "export.fun"]
+    export_violations = [v for v in result if v.rule == "export.fun"]
     assert len(export_violations) == 0  # 2 functions is under the limit of 10
 
 
@@ -108,7 +108,7 @@ def test_export_fun_char_literal_braces(check_result):
     """Braces in char literals like '{' or '}' should not affect function counting."""
     result = check_result(CODE_CHAR_LITERAL_BRACES_IN_FUNC)
     # Should detect exactly 2 exported functions, not be confused by '{' and '}'
-    export_violations = [v for v in result.violations if v.rule == "export.fun"]
+    export_violations = [v for v in result if v.rule == "export.fun"]
     assert len(export_violations) == 0  # 2 functions is under the limit of 10
 
 
@@ -332,7 +332,7 @@ def test_export_other_is_major(check_result):
     """export.other violations should be MAJOR severity."""
     code = "int a;\nint b;\n"
     result = check_result(code)
-    violations = [v for v in result.violations if v.rule == "export.other"]
+    violations = [v for v in result if v.rule == "export.other"]
     assert len(violations) > 0
     assert all(v.severity == Severity.MAJOR for v in violations)
 
