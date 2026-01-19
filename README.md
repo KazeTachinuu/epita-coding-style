@@ -30,6 +30,42 @@ epita-coding-style src/ --no-color       # Disable colored output
 epita-coding-style src/ -q               # Quiet mode (summary only)
 ```
 
+## Pre-commit Hook
+
+### Using pre-commit framework
+
+Add to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/KazeTachinuu/epita-coding-style
+    rev: v2.0.2
+    hooks:
+      - id: epita-coding-style
+```
+
+Then run:
+```bash
+pre-commit install
+```
+
+### Manual git hook
+
+If you don't want to use the pre-commit framework, create `.git/hooks/pre-commit`:
+
+```bash
+#!/bin/bash
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|h)$')
+if [ -n "$files" ]; then
+    epita-coding-style $files
+fi
+```
+
+Make it executable:
+```bash
+chmod +x .git/hooks/pre-commit
+```
+
 ## Rules Checked
 
 | Rule | Description |
@@ -71,8 +107,8 @@ Files: 2  Major: 2  Minor: 1
 
 ```bash
 # Clone and setup
-git clone https://github.com/KazeTachinuu/coding-style
-cd coding-style
+git clone https://github.com/KazeTachinuu/epita-coding-style
+cd epita-coding-style
 uv sync --dev
 
 # Run tests
