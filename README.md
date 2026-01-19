@@ -16,19 +16,18 @@ pip install epita-coding-style
 ## Usage
 
 ```bash
-# Check current directory
-coding-style-check
+epita-coding-style <path> [options]
 
-# Check specific files or directories
-coding-style-check src/
-coding-style-check main.c utils.h
+# Examples
+epita-coding-style .                 # Check current directory
+epita-coding-style src/              # Check a directory recursively
+epita-coding-style main.c utils.h    # Check specific files
 
 # Options
-coding-style-check --help
-coding-style-check --max-lines 30    # Custom max function lines
-coding-style-check --max-args 5      # Custom max function args
-coding-style-check --no-color        # Disable colored output
-coding-style-check -q                # Quiet mode (summary only)
+epita-coding-style src/ --max-lines 30   # Max 30 lines per function
+epita-coding-style src/ --max-args 5     # Max 5 args per function
+epita-coding-style src/ --no-color       # Disable colored output
+epita-coding-style src/ -q               # Quiet mode (summary only)
 ```
 
 ## Rules Checked

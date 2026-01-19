@@ -352,13 +352,22 @@ def find_files(paths: list[str]) -> list[str]:
 
 
 def main():
-    ap = argparse.ArgumentParser(description='EPITA C Style Checker')
-    ap.add_argument('paths', nargs='*', default=['.'], help='Files/directories to check')
-    ap.add_argument('--max-lines', type=int, default=40)
-    ap.add_argument('--max-args', type=int, default=4)
-    ap.add_argument('--max-funcs', type=int, default=10)
-    ap.add_argument('-q', '--quiet', action='store_true')
-    ap.add_argument('--no-color', action='store_true')
+    ap = argparse.ArgumentParser(
+        description='EPITA C Coding Style Checker - validates C code against EPITA coding standards',
+        epilog='Exit code: 0 if no major violations, 1 otherwise.'
+    )
+    ap.add_argument('paths', nargs='+', metavar='PATH',
+                    help='C files or directories to check (searches recursively)')
+    ap.add_argument('--max-lines', type=int, default=40, metavar='N',
+                    help='max lines per function body (default: 40)')
+    ap.add_argument('--max-args', type=int, default=4, metavar='N',
+                    help='max arguments per function (default: 4)')
+    ap.add_argument('--max-funcs', type=int, default=10, metavar='N',
+                    help='max exported functions per file (default: 10)')
+    ap.add_argument('-q', '--quiet', action='store_true',
+                    help='only show summary, not individual violations')
+    ap.add_argument('--no-color', action='store_true',
+                    help='disable colored output')
     args = ap.parse_args()
 
     # Colors

@@ -1,6 +1,6 @@
 """EPITA C Coding Style Checker."""
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 from .checker import check_file, Violation, Severity, main
 
