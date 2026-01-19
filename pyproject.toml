@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "epita-coding-style"
-version = "2.0.2"
+version = "2.1.0"
 description = "EPITA C Coding Style Checker - validates C code against EPITA coding standards"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,7 @@ keywords = ["c", "coding-style", "linter", "epita", "checker"]
 dependencies = [
     "tree-sitter>=0.23.0",
     "tree-sitter-c>=0.23.0",
+    "tomli>=2.0.0; python_version < '3.11'",
 ]
 
 [project.scripts]
@@ -47,6 +48,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/epita_coding_style"]
+include = ["src/epita_coding_style/.clang-format"]
 
 [tool.hatch.build.targets.sdist]
 include = [

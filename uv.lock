@@ -13,9 +13,10 @@ wheels = [
 
 [[package]]
 name = "epita-coding-style"
-version = "2.0.1"
+version = "2.0.3"
 source = { editable = "." }
 dependencies = [
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "tree-sitter" },
     { name = "tree-sitter-c" },
 ]
@@ -28,6 +29,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0.0" },
     { name = "tree-sitter", specifier = ">=0.23.0" },
     { name = "tree-sitter-c", specifier = ">=0.23.0" },
 ]

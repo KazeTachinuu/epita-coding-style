@@ -1,6 +1,6 @@
 # EPITA C Coding Style Checker
 
-A fast C code linter that validates against EPITA coding style rules. Uses [tree-sitter](https://tree-sitter.github.io/) for robust parsing.
+A fast C linter for EPITA coding style rules. Uses [tree-sitter](https://tree-sitter.github.io/) for robust AST-based parsing.
 
 ## Installation
 
@@ -8,114 +8,108 @@ A fast C code linter that validates against EPITA coding style rules. Uses [tree
 pipx install epita-coding-style
 ```
 
-Or with pip:
-```bash
-pip install epita-coding-style
-```
-
 ## Usage
 
 ```bash
-epita-coding-style <path> [options]
-
-# Examples
-epita-coding-style .                 # Check current directory
-epita-coding-style src/              # Check a directory recursively
-epita-coding-style main.c utils.h    # Check specific files
-
-# Options
-epita-coding-style src/ --max-lines 30   # Max 30 lines per function
-epita-coding-style src/ --max-args 5     # Max 5 args per function
-epita-coding-style src/ --no-color       # Disable colored output
-epita-coding-style src/ -q               # Quiet mode (summary only)
+epita-coding-style <path>              # Check files/directories
+epita-coding-style src/ --preset 42sh  # Use relaxed preset
+epita-coding-style src/ --config style.toml  # Use config file
+epita-coding-style --list-rules        # List all rules
 ```
+
+## Configuration
+
+**Default:** Strict EPITA rules (30 lines max, goto/cast banned).
+
+### Presets
+
+```bash
+epita-coding-style --preset 42sh src/  # Relaxed: 40 lines, goto/cast allowed
+```
+
+### Config File
+
+Create `.epita-style.toml` in your project root:
+
+```toml
+max_lines = 40
+max_args = 4
+max_funcs = 10
+
+[rules]
+"keyword.goto" = false
+"cast" = false
+```
+
+Or in `pyproject.toml`:
+
+```toml
+[tool.epita-coding-style]
+max_lines = 40
+
+[tool.epita-coding-style.rules]
+"keyword.goto" = false
+```
+
+### CLI Options
+
+```
+--preset NAME   Use preset (42sh)
+--config FILE   Use config file
+--max-lines N   Max lines per function
+--max-args N    Max args per function
+--max-funcs N   Max exported functions
+-q, --quiet     Summary only
+--no-color      Disable colors
+--list-rules    List all rules
+```
+
+## Rules
+
+| Rule | Description | Default |
+|------|-------------|---------|
+| `fun.length` | Max lines per function body | 30 |
+| `fun.arg.count` | Max arguments per function | 4 |
+| `fun.proto.void` | Empty params should use `void` | on |
+| `export.fun` | Max exported functions per file | 10 |
+| `export.other` | Max exported globals per file | 1 |
+| `braces` | Allman brace style | on |
+| `decl.single` | One declaration per line | on |
+| `decl.vla` | No variable-length arrays | on |
+| `keyword.goto` | No goto statements | on |
+| `cast` | No explicit casts | on |
+| `stat.asm` | No asm declarations | on |
+| `ctrl.empty` | Empty loops use `continue` | on |
+| `file.trailing` | No trailing whitespace | on |
+| `file.dos` | No CRLF line endings | on |
+| `file.terminate` | File ends with newline | on |
+| `file.spurious` | No blank lines at file start/end | on |
+| `lines.empty` | No consecutive empty lines | on |
+| `cpp.guard` | Headers need include guards | on |
+| `cpp.mark` | `#` on first column | on |
+| `cpp.if` | `#endif` needs comment | on |
+| `cpp.digraphs` | No digraphs/trigraphs | on |
+| `format` | clang-format compliance | on |
+
+## clang-format
+
+The `format` rule uses `clang-format` to check code formatting. Requires `clang-format` to be installed.
+
+The checker looks for `.clang-format` in the file's directory (walking up to root), or uses the bundled EPITA config.
+
+To disable: set `"format" = false` in your config.
 
 ## Pre-commit Hook
 
-### Using pre-commit framework
-
-Add to your `.pre-commit-config.yaml`:
+Add to `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
   - repo: https://github.com/KazeTachinuu/epita-coding-style
-    rev: v2.0.2
+    rev: v2.1.0
     hooks:
       - id: epita-coding-style
-```
-
-Then run:
-```bash
-pre-commit install
-```
-
-### Manual git hook
-
-If you don't want to use the pre-commit framework, create `.git/hooks/pre-commit`:
-
-```bash
-#!/bin/bash
-files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|h)$')
-if [ -n "$files" ]; then
-    epita-coding-style $files
-fi
-```
-
-Make it executable:
-```bash
-chmod +x .git/hooks/pre-commit
-```
-
-## Rules Checked
-
-| Rule | Description |
-|------|-------------|
-| `fun.length` | Max 40 lines per function body |
-| `fun.arg.count` | Max 4 arguments per function |
-| `fun.proto.void` | Empty params should use `void` |
-| `export.fun` | Max 10 exported functions per file |
-| `export.other` | Max 1 exported global variable |
-| `braces` | Allman brace style (braces on own line) |
-| `decl.single` | One declaration per line |
-| `decl.vla` | No variable-length arrays |
-| `file.trailing` | No trailing whitespace |
-| `file.dos` | No CRLF line endings |
-| `file.terminate` | File must end with newline |
-| `file.spurious` | No blank lines at start/end |
-| `lines.empty` | No consecutive empty lines |
-| `cpp.guard` | Header files need include guards |
-| `cpp.mark` | Preprocessor `#` on first column |
-| `cpp.if` | `#endif` needs comment |
-| `cpp.digraphs` | No digraphs/trigraphs |
-| `stat.asm` | No asm declarations |
-| `ctrl.empty` | Empty loops should use `continue` |
-
-## Example Output
-
-```
-src/parser.c
-  42: [MAJOR] fun.arg.count: 'parse_node' has 5 args (max 4)
-  156: [MAJOR] fun.length: Function has 45 lines (max 40)
-
-src/utils.c
-  12: [MINOR] file.trailing: Trailing whitespace
-
-Files: 2  Major: 2  Minor: 1
-```
-
-## Development
-
-```bash
-# Clone and setup
-git clone https://github.com/KazeTachinuu/epita-coding-style
-cd epita-coding-style
-uv sync --dev
-
-# Run tests
-uv run pytest
-
-# Build
-python -m build
+        args: [--preset, 42sh]  # optional
 ```
 
 ## License
