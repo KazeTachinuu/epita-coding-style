@@ -3,9 +3,11 @@
 
 import argparse
 import os
+import re
 import sys
 from dataclasses import dataclass
 from enum import Enum
+
 from tree_sitter import Language, Parser
 import tree_sitter_c as tsc
 
@@ -111,7 +113,6 @@ def check_braces(path: str, lines: list[str]) -> list[Violation]:
             continue
 
         # Remove char literals to avoid '{'/'}'
-        import re
         clean = re.sub(r"'(?:\\.|[^'\\])'", "   ", s)
 
         # Opening brace
@@ -287,15 +288,12 @@ def check_misc(path: str, lines: list[str]) -> list[Violation]:
 
         # Multiple declarations: int a, b;
         if not s.startswith('for') and ',' in s and not s.endswith(')') and not s.endswith('){'):
-            # Simple heuristic for "type var, var"
-            import re
             if re.match(r'^\s*(?:int|char|short|long|float|double)\s+\*?\w+\s*,', s):
                 v.append(Violation(path, i, "decl.single", "One declaration per line"))
 
         # VLA (check if inside any braces on this line or previous context)
         in_block = brace_depth > 0 or ('{' in s and '}' in s)
         if in_block:
-            import re
             m = re.search(r'\b\w+\s+\w+\s*\[\s*([a-z_]\w*)\s*\]', s)
             if m and '=' not in s and not m.group(1).isupper():
                 v.append(Violation(path, i, "decl.vla", "VLA not allowed"))

@@ -1,9 +1,9 @@
 """Tests for declaration rules."""
 
 import pytest
+from textwrap import dedent
 
 
-# decl.single: one declaration per line
 @pytest.mark.parametrize("code,should_fail", [
     ("int x;\n", False),
     ("int x = 1;\n", False),
@@ -14,10 +14,15 @@ def test_decl_single(check, code, should_fail):
     assert check(code, "decl.single") == should_fail
 
 
-# decl.vla: no variable-length arrays
+VLA_MACRO_OK = dedent("""\
+    #define SIZE 10
+    void f(void) { int arr[SIZE]; }
+""")
+
+
 @pytest.mark.parametrize("code,should_fail", [
     ("void f(void) { int arr[10]; }\n", False),
-    ("#define SIZE 10\nvoid f(void) { int arr[SIZE]; }\n", False),
+    (VLA_MACRO_OK, False),
     ("void f(int n) { int arr[n]; }\n", True),
 ])
 def test_decl_vla(check, code, should_fail):

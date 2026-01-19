@@ -1,0 +1,6 @@
+- id: epita-coding-style
+  name: EPITA C Coding Style
+  description: Validates C code against EPITA coding standards
+  entry: epita-coding-style
+  language: python
+  types_or: [c, header]

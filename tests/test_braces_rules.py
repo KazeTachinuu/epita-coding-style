@@ -1,143 +1,126 @@
 """Tests for braces rules (Allman style)."""
 
 import pytest
+from textwrap import dedent
 
-
-# Allman style code samples
-CODE_ALLMAN = """\
-void f(void)
-{
-    if (x)
+# Valid Allman style
+ALLMAN = dedent("""\
+    void f(void)
     {
-        y++;
+        if (x)
+        {
+            y++;
+        }
     }
-}
-"""
+""")
 
-CODE_KR_FUNC = """\
-void f(void) {
-    return;
-}
-"""
-
-CODE_KR_IF = """\
-void f(void)
-{
-    if (x) {
-        y++;
+# K&R violations
+KR_FUNC = dedent("""\
+    void f(void) {
+        return;
     }
-}
-"""
+""")
 
-CODE_ELSE_SAME_LINE = """\
-void f(void)
-{
-    if (x)
+KR_IF = dedent("""\
+    void f(void)
     {
-        y++;
-    } else {
-        z++;
+        if (x) {
+            y++;
+        }
     }
-}
-"""
+""")
 
-CODE_INITIALIZER = """\
-int arr[] = {1, 2, 3};
-"""
-
-CODE_DO_WHILE = """\
-void f(void)
-{
-    do
+ELSE_SAME_LINE = dedent("""\
+    void f(void)
     {
-        x++;
-    } while (x < 10);
-}
-"""
-
-CODE_MACRO_BRACES = """\
-#define MACRO(x) do { \\
-    x++; \\
-} while (0)
-"""
-
-# Character literals containing braces - should NOT trigger violations
-CODE_CHAR_LITERAL_OPEN_BRACE = """\
-void f(void)
-{
-    if (input[start] == '{')
-    {
-        x++;
+        if (x)
+        {
+            y++;
+        } else {
+            z++;
+        }
     }
-}
-"""
+""")
 
-CODE_CHAR_LITERAL_CLOSE_BRACE = """\
-void f(void)
-{
-    while (input[i] && input[i] != '}')
+# Allowed exceptions
+DO_WHILE = dedent("""\
+    void f(void)
     {
-        i++;
+        do
+        {
+            x++;
+        } while (x < 10);
     }
-    if (input[i] == '}')
+""")
+
+MACRO = dedent("""\
+    #define MACRO(x) do { \\
+        x++; \\
+    } while (0)
+""")
+
+# Char literals with braces
+CHAR_OPEN = dedent("""\
+    void f(void)
     {
-        i++;
+        if (input[start] == '{')
+        {
+            x++;
+        }
     }
-}
-"""
+""")
 
-CODE_CHAR_LITERAL_BOTH_BRACES = """\
-void f(void)
-{
-    if (c == '{' || c == '}')
+CHAR_CLOSE = dedent("""\
+    void f(void)
     {
-        return 1;
+        while (input[i] && input[i] != '}')
+        {
+            i++;
+        }
     }
-}
-"""
+""")
+
+CHAR_BOTH = dedent("""\
+    void f(void)
+    {
+        if (c == '{' || c == '}')
+        {
+            return 1;
+        }
+    }
+""")
+
+CHAR_WITH_VIOLATION = dedent("""\
+    void f(void)
+    {
+        if (c == '}') { x++; }
+    }
+""")
 
 
-# braces: Braces must be on their own line (Allman style)
 @pytest.mark.parametrize("code,should_fail", [
-    (CODE_ALLMAN, False),
-    (CODE_KR_FUNC, True),
-    (CODE_KR_IF, True),
-    (CODE_ELSE_SAME_LINE, True),
+    (ALLMAN, False),
+    (KR_FUNC, True),
+    (KR_IF, True),
+    (ELSE_SAME_LINE, True),
 ])
 def test_braces(check, code, should_fail):
     assert check(code, "braces") == should_fail
 
 
-# Allowed exceptions to braces rule
-@pytest.mark.parametrize("code,should_fail", [
-    (CODE_INITIALIZER, False),
-    (CODE_DO_WHILE, False),
-    (CODE_MACRO_BRACES, False),
+@pytest.mark.parametrize("code", [
+    "int arr[] = {1, 2, 3};\n",
+    DO_WHILE,
+    MACRO,
 ])
-def test_braces_exceptions(check, code, should_fail):
-    assert check(code, "braces") == should_fail
+def test_braces_exceptions(check, code):
+    assert not check(code, "braces")
 
 
-# Character literals containing braces should NOT trigger false positives
-@pytest.mark.parametrize("code,should_fail", [
-    (CODE_CHAR_LITERAL_OPEN_BRACE, False),
-    (CODE_CHAR_LITERAL_CLOSE_BRACE, False),
-    (CODE_CHAR_LITERAL_BOTH_BRACES, False),
-])
-def test_braces_char_literals_not_false_positive(check, code, should_fail):
-    """Braces inside character literals like '{' or '}' should not trigger violations."""
-    assert check(code, "braces") == should_fail
+@pytest.mark.parametrize("code", [CHAR_OPEN, CHAR_CLOSE, CHAR_BOTH])
+def test_braces_char_literals_no_false_positive(check, code):
+    assert not check(code, "braces")
 
 
-# Real brace violation on line with '}' char literal - MUST still be caught
-CODE_REAL_VIOLATION_WITH_CHAR_LITERAL = """\
-void f(void)
-{
-    if (c == '}') { x++; }
-}
-"""
-
-
-def test_braces_real_violation_with_char_literal(check):
-    """Real brace violation on same line as '}' char literal must still be caught."""
-    assert check(CODE_REAL_VIOLATION_WITH_CHAR_LITERAL, "braces") == True
+def test_braces_char_literal_with_violation(check):
+    assert check(CHAR_WITH_VIOLATION, "braces")
