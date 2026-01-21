@@ -1,6 +1,8 @@
 """EPITA C Coding Style Checker."""
 
-__version__ = "2.2.0"
+from importlib.metadata import version
+
+__version__ = version("epita-coding-style")
 
 from .core import Violation, Severity
 from .config import Config, load_config, PRESETS

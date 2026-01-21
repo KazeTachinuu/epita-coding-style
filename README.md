@@ -133,6 +133,31 @@ repos:
         args: [--preset, 42sh]  # optional
 ```
 
+## Development
+
+### Releasing a New Version
+
+Version is managed in `pyproject.toml` (single source of truth). Use `uv version` to bump:
+
+```bash
+uv version --bump patch   # 2.2.1 -> 2.2.2
+uv version --bump minor   # 2.2.1 -> 2.3.0
+uv version --bump major   # 2.2.1 -> 3.0.0
+# or set explicitly:
+uv version 2.3.0
+```
+
+Then commit, tag, and push:
+
+```bash
+git add pyproject.toml uv.lock
+git commit -m "Bump version to X.Y.Z"
+git tag vX.Y.Z
+git push origin master && git push origin vX.Y.Z
+```
+
+The CI will automatically publish to PyPI when a tag is pushed.
+
 ## License
 
 MIT
