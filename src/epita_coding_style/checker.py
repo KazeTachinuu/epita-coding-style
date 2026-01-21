@@ -58,10 +58,14 @@ def find_files(paths: list[str]) -> list[str]:
     return sorted(files)
 
 
-def _print_rules():
+def _print_rules(use_color: bool = True):
     """Print all rules grouped by category with descriptions."""
     cfg = Config()
     categories: dict[str, list[tuple[str, str, bool]]] = {}
+
+    BOLD = '\033[1m' if use_color else ''
+    DIM = '\033[2m' if use_color else ''
+    RST = '\033[0m' if use_color else ''
 
     for rule in sorted(cfg.rules.keys()):
         desc, cat = RULES_META.get(rule, (rule, "Other"))
@@ -77,9 +81,9 @@ def _print_rules():
         if not first:
             print()
         first = False
-        print(f"{cat}:")
+        print(f"{BOLD}{cat}:{RST}")
         for rule, desc, _ in categories[cat]:
-            print(f"  {rule:<20} {desc}")
+            print(f"  {rule:<20} {DIM}{desc}{RST}")
 
 
 def _print_config(cfg: Config, use_color: bool = True):
@@ -207,9 +211,18 @@ Exit codes:
 
     args = ap.parse_args()
 
+    # Determine if we should use colors:
+    # --no-color flag > NO_COLOR env > FORCE_COLOR env > isatty()
+    if args.no_color or os.environ.get('NO_COLOR'):
+        use_color = False
+    elif os.environ.get('FORCE_COLOR'):
+        use_color = True
+    else:
+        use_color = sys.stdout.isatty()
+
     # Info commands (no paths required)
     if args.list_rules:
-        _print_rules()
+        _print_rules(use_color=use_color)
         return 0
 
     if args.show_config:
@@ -220,7 +233,7 @@ Exit codes:
             max_args=args.max_args,
             max_funcs=args.max_funcs,
         )
-        _print_config(cfg, use_color=not args.no_color)
+        _print_config(cfg, use_color=use_color)
         return 0
 
     # Require paths for checking
@@ -238,7 +251,7 @@ Exit codes:
 
     # Colors
     R, Y, C, W, B, RST = ('\033[91m', '\033[93m', '\033[96m', '\033[97m', '\033[1m', '\033[0m')
-    if args.no_color:
+    if not use_color:
         R = Y = C = W = B = RST = ''
 
     files = find_files(args.paths)
