@@ -11,6 +11,41 @@ except ImportError:
     import tomli as tomllib  # type: ignore
 
 
+# Rule metadata: (short_description, category)
+RULES_META: dict[str, tuple[str, str]] = {
+    # File format
+    "file.dos": ("No CRLF line endings (use Unix LF)", "File"),
+    "file.terminate": ("File must end with a newline", "File"),
+    "file.spurious": ("No blank lines at file start/end", "File"),
+    "file.trailing": ("No trailing whitespace", "File"),
+    "lines.empty": ("No consecutive empty lines", "File"),
+    # Braces
+    "braces": ("Allman brace style (braces on own line)", "Style"),
+    # Functions
+    "fun.length": ("Max lines per function body", "Functions"),
+    "fun.arg.count": ("Max arguments per function", "Functions"),
+    "fun.proto.void": ("Use (void) for functions with no parameters", "Functions"),
+    # Exports
+    "export.fun": ("Max exported (non-static) functions per file", "Exports"),
+    "export.other": ("Max exported global variables per file", "Exports"),
+    # Preprocessor
+    "cpp.guard": ("Header files must have include guards", "Preprocessor"),
+    "cpp.mark": ("# must be in first column", "Preprocessor"),
+    "cpp.if": ("#endif should have a comment", "Preprocessor"),
+    "cpp.digraphs": ("No digraphs or trigraphs", "Preprocessor"),
+    # Declarations & control
+    "decl.single": ("One variable declaration per line", "Declarations"),
+    "decl.vla": ("No variable-length arrays", "Declarations"),
+    "stat.asm": ("No inline assembly", "Declarations"),
+    "ctrl.empty": ("Use 'continue' in empty loop bodies", "Control"),
+    # Strict
+    "keyword.goto": ("No goto statements", "Strict"),
+    "cast": ("No explicit casts", "Strict"),
+    # Formatting
+    "format": ("clang-format compliance check", "Formatting"),
+}
+
+
 @dataclass
 class Config:
     """Checker configuration."""
