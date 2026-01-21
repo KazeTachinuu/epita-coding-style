@@ -95,25 +95,33 @@ def load_config(
     """
     cfg = Config()
 
-    # 1. Apply preset
+    # 1. Apply CLI preset first (lowest priority for presets)
     if preset and preset in PRESETS:
         _apply_dict(cfg, PRESETS[preset])
 
     # 2. Load config file
+    file_data: dict[str, Any] | None = None
     if config_path and config_path.exists():
-        _apply_dict(cfg, _load_toml(config_path))
+        file_data = _load_toml(config_path)
     else:
         # Auto-detect config files
-        for name in (".epita-style.toml", "epita-style.toml"):
+        for name in (".epita-style", ".epita-style.toml", "epita-style.toml"):
             if Path(name).exists():
-                _apply_dict(cfg, _load_toml(Path(name)))
+                file_data = _load_toml(Path(name))
                 break
         else:
             # Check pyproject.toml
             if Path("pyproject.toml").exists():
                 data = _load_toml(Path("pyproject.toml"))
                 if "tool" in data and "epita-coding-style" in data["tool"]:
-                    _apply_dict(cfg, data["tool"]["epita-coding-style"])
+                    file_data = data["tool"]["epita-coding-style"]
+
+    # 2b. Apply preset from config file (if no CLI preset), then apply config values
+    if file_data:
+        file_preset = file_data.get("preset")
+        if file_preset and file_preset in PRESETS and not preset:
+            _apply_dict(cfg, PRESETS[file_preset])
+        _apply_dict(cfg, file_data)
 
     # 3. Apply CLI overrides
     for key, val in overrides.items():

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import Config, PRESETS, load_config
-from .core import Violation, Severity, parse
+from .core import Violation, Severity, parse, NodeCache
 from .checks import (
     check_file_format,
     check_braces,
@@ -33,14 +33,15 @@ def check_file(path: str, cfg: Config) -> list[Violation]:
     lines = content.split('\n')
     content_bytes = content.encode()
     tree = parse(content_bytes)
+    nodes = NodeCache(tree)
 
     return (
         check_file_format(path, content, lines, cfg) +
         check_braces(path, lines, cfg) +
-        check_functions(path, tree, content_bytes, lines, cfg) +
-        check_exports(path, tree, content_bytes, cfg) +
+        check_functions(path, nodes, content_bytes, lines, cfg) +
+        check_exports(path, nodes, content_bytes, cfg) +
         check_preprocessor(path, lines, cfg) +
-        check_misc(path, tree, content_bytes, lines, cfg) +
+        check_misc(path, nodes, content_bytes, lines, cfg) +
         check_clang_format(path, cfg)
     )
 

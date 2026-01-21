@@ -21,6 +21,14 @@ epita-coding-style --list-rules        # List all rules
 
 **Default:** Strict EPITA rules (30 lines max, goto/cast banned).
 
+Settings are applied in order of priority (highest wins):
+
+```
+CLI flags > Config file > Preset > Defaults
+```
+
+This means you can start with a preset and override specific settings in your config file or via CLI.
+
 ### Presets
 
 ```bash
@@ -29,19 +37,19 @@ epita-coding-style --preset 42sh src/  # Relaxed: 40 lines, goto/cast allowed
 
 ### Config File
 
-Create `.epita-style.toml` in your project root:
+Create `.epita-style` (or `.epita-style.toml`) in your project root:
 
 ```toml
 max_lines = 40
-max_args = 4
-max_funcs = 10
 
 [rules]
 "keyword.goto" = false
 "cast" = false
 ```
 
-Or in `pyproject.toml`:
+Auto-detection order: `.epita-style` → `.epita-style.toml` → `pyproject.toml`
+
+In `pyproject.toml`:
 
 ```toml
 [tool.epita-coding-style]
@@ -49,6 +57,19 @@ max_lines = 40
 
 [tool.epita-coding-style.rules]
 "keyword.goto" = false
+```
+
+### Combining Preset + Config
+
+Use a preset as a base and customize specific settings:
+
+```toml
+# .epita-style.toml
+preset = "42sh"      # Start with 42sh (40 lines, goto/cast allowed)
+max_lines = 50       # Override: bump to 50 lines
+
+[rules]
+"cast" = true        # Override: re-enable cast checking
 ```
 
 ### CLI Options

@@ -8,7 +8,12 @@ import shutil
 import subprocess
 
 from .config import Config
-from .core import Violation, Severity, find_nodes, text, find_id
+from .core import Violation, Severity, NodeCache, text, find_id
+
+# Pre-compiled regex patterns
+_CHAR_LITERAL = re.compile(r"'(?:\\.|[^'\\])'")
+_VLA_PATTERN = re.compile(r'\b\w+\s+\w+\s*\[\s*([a-z_]\w*)\s*\]')
+_CLANG_ERROR = re.compile(r'^.*:(\d+):\d+: (?:error|warning):')
 
 
 def check_file_format(path: str, content: str, lines: list[str], cfg: Config) -> list[Violation]:
@@ -73,7 +78,7 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
         if not s or s.startswith(('#', '//')):
             continue
 
-        clean = re.sub(r"'(?:\\.|[^'\\])'", "   ", s)
+        clean = _CHAR_LITERAL.sub("   ", s)
 
         if '{' in clean:
             pos = clean.find('{')
@@ -99,11 +104,11 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
     return v
 
 
-def check_functions(path: str, tree, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
+def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
     """Check function rules using AST."""
     v = []
 
-    for func in find_nodes(tree, 'function_definition'):
+    for func in nodes.get('function_definition'):
         line_num = func.start_point[0] + 1
         line_content = lines[func.start_point[0]] if func.start_point[0] < len(lines) else None
         name = None
@@ -145,7 +150,7 @@ def check_functions(path: str, tree, content: bytes, lines: list[str], cfg: Conf
 
     # Header declarations
     if path.endswith('.h'):
-        for decl in find_nodes(tree, 'declaration'):
+        for decl in nodes.get('declaration'):
             for child in decl.children:
                 if child.type == 'function_declarator':
                     name = None
@@ -171,7 +176,7 @@ def check_functions(path: str, tree, content: bytes, lines: list[str], cfg: Conf
     return v
 
 
-def check_exports(path: str, tree, content: bytes, cfg: Config) -> list[Violation]:
+def check_exports(path: str, nodes: NodeCache, content: bytes, cfg: Config) -> list[Violation]:
     """Check exported symbols in .c files."""
     if not path.endswith('.c'):
         return []
@@ -180,7 +185,7 @@ def check_exports(path: str, tree, content: bytes, cfg: Config) -> list[Violatio
 
     if cfg.is_enabled("export.fun"):
         exported = []
-        for func in find_nodes(tree, 'function_definition'):
+        for func in nodes.get('function_definition'):
             is_static = any(text(c, content) == 'static' for c in func.children if c.type == 'storage_class_specifier')
             if not is_static:
                 for child in func.children:
@@ -193,7 +198,7 @@ def check_exports(path: str, tree, content: bytes, cfg: Config) -> list[Violatio
 
     if cfg.is_enabled("export.other"):
         globals_found = []
-        for decl in tree.children:
+        for decl in nodes.root.children:
             if decl.type != 'declaration':
                 continue
             if any(c.type == 'function_declarator' for c in decl.children):
@@ -244,14 +249,14 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
     return v
 
 
-def check_misc(path: str, tree, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
+def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
     """Check misc rules (declarations, control structures, goto, cast)."""
     v = []
     brace_depth = 0
 
     # AST-based check for multiple declarations on one line
     if cfg.is_enabled("decl.single"):
-        for decl in find_nodes(tree, 'declaration'):
+        for decl in nodes.get('declaration'):
             # Skip function declarations
             if any(c.type == 'function_declarator' for c in decl.children):
                 continue
@@ -273,7 +278,7 @@ def check_misc(path: str, tree, content: bytes, lines: list[str], cfg: Config) -
         if cfg.is_enabled("decl.vla"):
             in_block = brace_depth > 0 or ('{' in s and '}' in s)
             if in_block:
-                m = re.search(r'\b\w+\s+\w+\s*\[\s*([a-z_]\w*)\s*\]', s)
+                m = _VLA_PATTERN.search(s)
                 if m and '=' not in s and not m.group(1).isupper():
                     col = line.find('[')
                     v.append(Violation(path, i, "decl.vla", "VLA not allowed",
@@ -293,14 +298,14 @@ def check_misc(path: str, tree, content: bytes, lines: list[str], cfg: Config) -
 
     # AST-based checks for goto and cast
     if cfg.is_enabled("keyword.goto"):
-        for node in find_nodes(tree, 'goto_statement'):
+        for node in nodes.get('goto_statement'):
             line_num = node.start_point[0] + 1
             line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
             v.append(Violation(path, line_num, "keyword.goto", "goto not allowed",
                               line_content=line_content, column=node.start_point[1]))
 
     if cfg.is_enabled("cast"):
-        for node in find_nodes(tree, 'cast_expression'):
+        for node in nodes.get('cast_expression'):
             line_num = node.start_point[0] + 1
             line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
             v.append(Violation(path, line_num, "cast", "Explicit cast not allowed",
@@ -353,8 +358,7 @@ def check_clang_format(path: str, cfg: Config) -> list[Violation]:
             # Count unique lines with formatting issues
             error_lines = set()
             for line in result.stderr.splitlines():
-                m = re.match(r'^.*:(\d+):\d+: (?:error|warning):', line)
-                if m:
+                if m := _CLANG_ERROR.match(line):
                     error_lines.add(int(m.group(1)))
             count = len(error_lines)
             if count > 0:
