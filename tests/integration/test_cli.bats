@@ -2,6 +2,7 @@
 # Integration tests for epita-coding-style CLI
 
 setup() {
+    PROJECT_DIR="$(pwd)"
     TMP_DIR=$(mktemp -d)
 
     # Clean file
@@ -236,14 +237,14 @@ teardown() {
 @test "auto-detects .epita-style in cwd" {
     echo -e '[rules]\n"keyword.goto" = false' > "$TMP_DIR/.epita-style"
     cd "$TMP_DIR"
-    run uv run epita-coding-style bad_goto.c
+    run uv run --project "$PROJECT_DIR" epita-coding-style bad_goto.c
     [ "$status" -eq 0 ]
 }
 
 @test "auto-detects .epita-style.toml in cwd" {
     echo -e '[rules]\n"cast" = false' > "$TMP_DIR/.epita-style.toml"
     cd "$TMP_DIR"
-    run uv run epita-coding-style bad_cast.c
+    run uv run --project "$PROJECT_DIR" epita-coding-style bad_cast.c
     [ "$status" -eq 0 ]
 }
 
@@ -253,10 +254,10 @@ teardown() {
     echo -e '[rules]\n"cast" = false' > "$TMP_DIR/.epita-style.toml"
     cd "$TMP_DIR"
     # goto should pass (disabled by .epita-style)
-    run uv run epita-coding-style bad_goto.c
+    run uv run --project "$PROJECT_DIR" epita-coding-style bad_goto.c
     [ "$status" -eq 0 ]
     # cast should fail (not disabled - .epita-style.toml ignored)
-    run uv run epita-coding-style bad_cast.c
+    run uv run --project "$PROJECT_DIR" epita-coding-style bad_cast.c
     [ "$status" -eq 1 ]
 }
 
