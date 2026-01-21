@@ -105,7 +105,8 @@ CHAR_WITH_VIOLATION = dedent("""\
     (ELSE_SAME_LINE, True),
 ])
 def test_braces(check, code, should_fail):
-    assert check(code, "braces") == should_fail
+    # Use noformat preset to test braces independently from clang-format
+    assert check(code, "braces", preset="noformat") == should_fail
 
 
 @pytest.mark.parametrize("code", [
@@ -114,13 +115,13 @@ def test_braces(check, code, should_fail):
     MACRO,
 ])
 def test_braces_exceptions(check, code):
-    assert not check(code, "braces")
+    assert not check(code, "braces", preset="noformat")
 
 
 @pytest.mark.parametrize("code", [CHAR_OPEN, CHAR_CLOSE, CHAR_BOTH])
 def test_braces_char_literals_no_false_positive(check, code):
-    assert not check(code, "braces")
+    assert not check(code, "braces", preset="noformat")
 
 
 def test_braces_char_literal_with_violation(check):
-    assert check(CHAR_WITH_VIOLATION, "braces")
+    assert check(CHAR_WITH_VIOLATION, "braces", preset="noformat")

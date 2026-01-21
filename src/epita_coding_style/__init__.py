@@ -1,6 +1,6 @@
 """EPITA C Coding Style Checker."""
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 
 from .core import Violation, Severity
 from .config import Config, load_config, PRESETS

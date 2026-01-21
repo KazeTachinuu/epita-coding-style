@@ -69,6 +69,14 @@ PRESETS: dict[str, dict[str, Any]] = {
             "cast": False,
         },
     },
+    "noformat": {
+        "max_lines": 40,
+        "rules": {
+            "keyword.goto": False,
+            "cast": False,
+            "format": False,
+        },
+    },
 }
 
 

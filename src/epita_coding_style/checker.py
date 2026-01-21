@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+from . import __version__
 from .config import Config, PRESETS, load_config
 from .core import Violation, Severity, parse
 from .checks import (
@@ -79,6 +80,8 @@ def main():
                     help='disable colored output')
     ap.add_argument('--list-rules', action='store_true',
                     help='list all rules and exit')
+    ap.add_argument('-v', '--version', action='version',
+                    version=f'%(prog)s {__version__}')
     args = ap.parse_args()
 
     # List rules and exit
@@ -113,6 +116,7 @@ def main():
         return 1
 
     total_major = total_minor = 0
+    files_needing_format = []
 
     for path in files:
         violations = check_file(path, cfg)
@@ -122,14 +126,27 @@ def main():
         total_major += major
         total_minor += minor
 
+        # Track files needing clang-format
+        if any(v.rule == "format" for v in violations):
+            files_needing_format.append(path)
+
         if not args.quiet and violations:
-            print(f"\n{W}{B}{path}{RST}")
             for v in violations:
                 color = R if v.severity == Severity.MAJOR else Y
-                print(f"  {C}{v.line}{RST}: {color}[{v.severity.value}]{RST} {v.rule}: {v.message}")
+                col_str = f":{v.column + 1}" if v.column is not None else ":1"
+                severity_word = "error" if v.severity == Severity.MAJOR else "warning"
+                print(f"{color}{path}:{v.line}{col_str}: {severity_word}: {v.message} [epita-{v.rule}]{RST}")
+                if v.line_content is not None:
+                    print(f"{v.line_content}")
+                    if v.column is not None:
+                        print(f"{' ' * v.column}{color}^{RST}")
 
     # Summary
     print(f"\n{W}Files: {len(files)}  Major: {R}{total_major}{RST}  Minor: {Y}{total_minor}{RST}")
+
+    # Show clang-format command if there are files to format
+    if files_needing_format:
+        print(f"\n{Y}Fix formatting:{RST} clang-format -i {' '.join(files_needing_format)}")
 
     return 1 if total_major > 0 else 0
 

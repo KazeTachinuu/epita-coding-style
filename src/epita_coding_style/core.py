@@ -24,6 +24,8 @@ class Violation:
     rule: str
     message: str
     severity: Severity = Severity.MAJOR
+    line_content: str | None = None
+    column: int | None = None
 
 
 def parse(content: bytes):

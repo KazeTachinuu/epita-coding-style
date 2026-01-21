@@ -16,27 +16,34 @@ def check_file_format(path: str, content: str, lines: list[str], cfg: Config) ->
     v = []
 
     if cfg.is_enabled("file.dos") and '\r\n' in content:
-        v.append(Violation(path, 1, "file.dos", "Use Unix LF, not DOS CRLF"))
+        v.append(Violation(path, 1, "file.dos", "Use Unix LF, not DOS CRLF",
+                          line_content=lines[0] if lines else None))
 
     if cfg.is_enabled("file.terminate") and content and not content.endswith('\n'):
-        v.append(Violation(path, len(lines), "file.terminate", "File must end with newline"))
+        v.append(Violation(path, len(lines), "file.terminate", "File must end with newline",
+                          line_content=lines[-1] if lines else None))
 
     if cfg.is_enabled("file.spurious"):
         if lines and not lines[0].strip():
-            v.append(Violation(path, 1, "file.spurious", "No blank lines at start of file"))
+            v.append(Violation(path, 1, "file.spurious", "No blank lines at start of file",
+                              line_content=lines[0]))
         end_idx = len(lines) - 2 if lines and lines[-1] == '' else len(lines) - 1
         if end_idx >= 0 and not lines[end_idx].strip():
-            v.append(Violation(path, end_idx + 1, "file.spurious", "No blank lines at end of file"))
+            v.append(Violation(path, end_idx + 1, "file.spurious", "No blank lines at end of file",
+                              line_content=lines[end_idx]))
 
     if cfg.is_enabled("lines.empty"):
         for i, line in enumerate(lines[1:], 2):
             if not line.strip() and not lines[i-2].strip():
-                v.append(Violation(path, i, "lines.empty", "No consecutive empty lines"))
+                v.append(Violation(path, i, "lines.empty", "No consecutive empty lines",
+                                  line_content=line))
 
     if cfg.is_enabled("file.trailing"):
         for i, line in enumerate(lines, 1):
             if line != line.rstrip():
-                v.append(Violation(path, i, "file.trailing", "Trailing whitespace", Severity.MINOR))
+                trailing_start = len(line.rstrip())
+                v.append(Violation(path, i, "file.trailing", "Trailing whitespace", Severity.MINOR,
+                                  line_content=line, column=trailing_start))
 
     return v
 
@@ -44,6 +51,9 @@ def check_file_format(path: str, content: str, lines: list[str], cfg: Config) ->
 def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
     """Check Allman brace style."""
     if not cfg.is_enabled("braces"):
+        return []
+    # Skip if format check is enabled - clang-format handles braces
+    if cfg.is_enabled("format"):
         return []
 
     v = []
@@ -74,13 +84,17 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
                 is_init = '=' in temp
             if before and not is_init and clean.strip() not in ('{}', '{ }') and before != 'do':
                 if not line.rstrip().endswith('\\'):
-                    v.append(Violation(path, i, "braces", "Opening brace must be on its own line"))
+                    col = line.find('{')
+                    v.append(Violation(path, i, "braces", "Opening brace must be on its own line",
+                                      line_content=line, column=col))
 
         if '}' in clean and not line.rstrip().endswith('\\'):
             pos = clean.find('}')
             after = clean[pos+1:].strip()
             if after and not after.startswith(('while', '//', '/*')) and after not in (';', ',', ');'):
-                v.append(Violation(path, i, "braces", "Closing brace must be on its own line"))
+                col = line.find('}')
+                v.append(Violation(path, i, "braces", "Closing brace must be on its own line",
+                                  line_content=line, column=col))
 
     return v
 
@@ -90,7 +104,8 @@ def check_functions(path: str, tree, content: bytes, lines: list[str], cfg: Conf
     v = []
 
     for func in find_nodes(tree, 'function_definition'):
-        line = func.start_point[0] + 1
+        line_num = func.start_point[0] + 1
+        line_content = lines[func.start_point[0]] if func.start_point[0] < len(lines) else None
         name = None
         params = []
         body = None
@@ -110,10 +125,12 @@ def check_functions(path: str, tree, content: bytes, lines: list[str], cfg: Conf
 
         if cfg.is_enabled("fun.proto.void"):
             if not params and ('()' in text(func, content) or '( )' in text(func, content)):
-                v.append(Violation(path, line, "fun.proto.void", f"'{name}' should use (void) for empty params"))
+                v.append(Violation(path, line_num, "fun.proto.void", f"'{name}' should use (void) for empty params",
+                                  line_content=line_content))
 
         if cfg.is_enabled("fun.arg.count") and len(params) > cfg.max_args:
-            v.append(Violation(path, line, "fun.arg.count", f"'{name}' has {len(params)} args (max {cfg.max_args})"))
+            v.append(Violation(path, line_num, "fun.arg.count", f"'{name}' has {len(params)} args (max {cfg.max_args})",
+                              line_content=line_content))
 
         if cfg.is_enabled("fun.length") and body:
             count = 0
@@ -123,7 +140,8 @@ def check_functions(path: str, tree, content: bytes, lines: list[str], cfg: Conf
                     if s and s not in ('{', '}') and not s.startswith(('//', '/*', '*')):
                         count += 1
             if count > cfg.max_lines:
-                v.append(Violation(path, line, "fun.length", f"Function has {count} lines (max {cfg.max_lines})"))
+                v.append(Violation(path, line_num, "fun.length", f"Function has {count} lines (max {cfg.max_lines})",
+                                  line_content=line_content))
 
     # Header declarations
     if path.endswith('.h'):
@@ -139,13 +157,16 @@ def check_functions(path: str, tree, content: bytes, lines: list[str], cfg: Conf
                             params = [p for p in c.children if p.type == 'parameter_declaration']
 
                     if name:
-                        line = child.start_point[0] + 1
+                        line_num = child.start_point[0] + 1
+                        line_content = lines[child.start_point[0]] if child.start_point[0] < len(lines) else None
                         decl_text = text(child, content)
                         if cfg.is_enabled("fun.proto.void"):
                             if not params and ('()' in decl_text or '( )' in decl_text):
-                                v.append(Violation(path, line, "fun.proto.void", f"'{name}' should use (void)"))
+                                v.append(Violation(path, line_num, "fun.proto.void", f"'{name}' should use (void)",
+                                                  line_content=line_content))
                         if cfg.is_enabled("fun.arg.count") and len(params) > cfg.max_args:
-                            v.append(Violation(path, line, "fun.arg.count", f"'{name}' has {len(params)} args (max {cfg.max_args})"))
+                            v.append(Violation(path, line_num, "fun.arg.count", f"'{name}' has {len(params)} args (max {cfg.max_args})",
+                                              line_content=line_content))
 
     return v
 
@@ -199,21 +220,26 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
     if cfg.is_enabled("cpp.guard") and path.endswith('.h'):
         guard = os.path.basename(path).upper().replace('.', '_').replace('-', '_')
         if not any('#ifndef' in l and guard in l for l in lines):
-            v.append(Violation(path, 1, "cpp.guard", f"Missing include guard (#ifndef {guard})"))
+            v.append(Violation(path, 1, "cpp.guard", f"Missing include guard (#ifndef {guard})",
+                              line_content=lines[0] if lines else None))
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
 
         if cfg.is_enabled("cpp.mark") and s.startswith('#') and line[0] != '#':
-            v.append(Violation(path, i, "cpp.mark", "# must be on first column"))
+            v.append(Violation(path, i, "cpp.mark", "# must be on first column",
+                              line_content=line, column=0))
 
         if cfg.is_enabled("cpp.if") and s.startswith('#endif') and '//' not in s and '/*' not in s:
-            v.append(Violation(path, i, "cpp.if", "#endif should have comment", Severity.MINOR))
+            v.append(Violation(path, i, "cpp.if", "#endif should have comment", Severity.MINOR,
+                              line_content=line))
 
         if cfg.is_enabled("cpp.digraphs"):
             for d in ['??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%', '%>', '<:', ':>']:
                 if d in line:
-                    v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed"))
+                    col = line.find(d)
+                    v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
+                                      line_content=line, column=col))
 
     return v
 
@@ -223,40 +249,62 @@ def check_misc(path: str, tree, content: bytes, lines: list[str], cfg: Config) -
     v = []
     brace_depth = 0
 
+    # AST-based check for multiple declarations on one line
+    if cfg.is_enabled("decl.single"):
+        for decl in find_nodes(tree, 'declaration'):
+            # Skip function declarations
+            if any(c.type == 'function_declarator' for c in decl.children):
+                continue
+            # Count init_declarators (each variable in the declaration)
+            declarators = [c for c in decl.children
+                         if c.type in ('init_declarator', 'pointer_declarator', 'identifier', 'array_declarator')]
+            if len(declarators) > 1:
+                line_num = decl.start_point[0] + 1
+                line_content = lines[decl.start_point[0]] if decl.start_point[0] < len(lines) else None
+                # Find the comma within the declaration span, not the whole line
+                col = decl.start_point[1]  # Point to start of declaration
+                v.append(Violation(path, line_num, "decl.single", "One declaration per line",
+                                  line_content=line_content, column=col))
+
     for i, line in enumerate(lines, 1):
         s = line.strip()
         brace_depth += line.count('{') - line.count('}')
-
-        if cfg.is_enabled("decl.single"):
-            if not s.startswith('for') and ',' in s and not s.endswith(')') and not s.endswith('){'):
-                if re.match(r'^\s*(?:int|char|short|long|float|double)\s+\*?\w+\s*,', s):
-                    v.append(Violation(path, i, "decl.single", "One declaration per line"))
 
         if cfg.is_enabled("decl.vla"):
             in_block = brace_depth > 0 or ('{' in s and '}' in s)
             if in_block:
                 m = re.search(r'\b\w+\s+\w+\s*\[\s*([a-z_]\w*)\s*\]', s)
                 if m and '=' not in s and not m.group(1).isupper():
-                    v.append(Violation(path, i, "decl.vla", "VLA not allowed"))
+                    col = line.find('[')
+                    v.append(Violation(path, i, "decl.vla", "VLA not allowed",
+                                      line_content=line, column=col))
 
         if cfg.is_enabled("stat.asm"):
             if any(kw in s for kw in ['asm(', '__asm__', '__asm']):
-                v.append(Violation(path, i, "stat.asm", "asm not allowed"))
+                v.append(Violation(path, i, "stat.asm", "asm not allowed",
+                                  line_content=line))
 
         if cfg.is_enabled("ctrl.empty"):
             if s == ';' and i > 1:
                 prev = lines[i-2].strip()
                 if prev.startswith(('for', 'while')):
-                    v.append(Violation(path, i, "ctrl.empty", "Use 'continue' for empty loops"))
+                    v.append(Violation(path, i, "ctrl.empty", "Use 'continue' for empty loops",
+                                      line_content=line))
 
     # AST-based checks for goto and cast
     if cfg.is_enabled("keyword.goto"):
         for node in find_nodes(tree, 'goto_statement'):
-            v.append(Violation(path, node.start_point[0] + 1, "keyword.goto", "goto not allowed"))
+            line_num = node.start_point[0] + 1
+            line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+            v.append(Violation(path, line_num, "keyword.goto", "goto not allowed",
+                              line_content=line_content, column=node.start_point[1]))
 
     if cfg.is_enabled("cast"):
         for node in find_nodes(tree, 'cast_expression'):
-            v.append(Violation(path, node.start_point[0] + 1, "cast", "Explicit cast not allowed"))
+            line_num = node.start_point[0] + 1
+            line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+            v.append(Violation(path, line_num, "cast", "Explicit cast not allowed",
+                              line_content=line_content, column=node.start_point[1]))
 
     return v
 
@@ -302,7 +350,18 @@ def check_clang_format(path: str, cfg: Config) -> list[Violation]:
             timeout=10,
         )
         if result.returncode != 0:
-            return [Violation(path, 1, "format", "File needs formatting (run clang-format)", Severity.MINOR)]
+            # Count unique lines with formatting issues
+            error_lines = set()
+            for line in result.stderr.splitlines():
+                m = re.match(r'^.*:(\d+):\d+: (?:error|warning):', line)
+                if m:
+                    error_lines.add(int(m.group(1)))
+            count = len(error_lines)
+            if count > 0:
+                msg = f"{count} line{'s' if count > 1 else ''} need{'s' if count == 1 else ''} formatting"
+            else:
+                msg = "Needs formatting"
+            return [Violation(path, 1, "format", msg, Severity.MINOR)]
     except (subprocess.TimeoutExpired, subprocess.SubprocessError):
         pass
 
