@@ -104,6 +104,27 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
     return v
 
 
+def _find_function_declarator(node):
+    """Find innermost function_declarator (the one defining the actual function).
+
+    For complex return types like function pointers:
+    - int (*f(void))(int) has nested function_declarators
+    - We need the innermost one containing the actual function name
+    """
+    if node.type == 'function_declarator':
+        # Check for nested function_declarator inside (for function pointer returns)
+        for child in node.children:
+            if inner := _find_function_declarator(child):
+                return inner
+        return node
+    # Handle wrapped declarators (pointers, arrays, parenthesized)
+    if node.type in ('pointer_declarator', 'array_declarator', 'parenthesized_declarator'):
+        for child in node.children:
+            if result := _find_function_declarator(child):
+                return result
+    return None
+
+
 def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
     """Check function rules using AST."""
     v = []
@@ -116,11 +137,13 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
         body = None
 
         for child in func.children:
-            if child.type == 'function_declarator':
-                for c in child.children:
-                    if c.type == 'identifier':
-                        name = text(c, content)
-                    elif c.type == 'parameter_list':
+            func_decl = _find_function_declarator(child)
+            if func_decl:
+                # Find name (may be inside parenthesized_declarator for complex decls)
+                name = find_id(func_decl, content)
+                # Find parameter list
+                for c in func_decl.children:
+                    if c.type == 'parameter_list':
                         params = [p for p in c.children if p.type == 'parameter_declaration']
             elif child.type == 'compound_statement':
                 body = child
