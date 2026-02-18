@@ -58,24 +58,28 @@ def find_files(paths: list[str]) -> list[str]:
     return sorted(files)
 
 
-def _print_rules(use_color: bool = True):
-    """Print all rules grouped by category with descriptions."""
-    cfg = Config()
+CATEGORY_ORDER = ["File", "Style", "Functions", "Exports", "Preprocessor",
+                  "Declarations", "Control", "Strict", "Formatting", "Other"]
+
+
+def _group_rules(cfg: Config) -> dict[str, list[tuple[str, str, bool]]]:
     categories: dict[str, list[tuple[str, str, bool]]] = {}
-
-    BOLD = '\033[1m' if use_color else ''
-    DIM = '\033[2m' if use_color else ''
-    RST = '\033[0m' if use_color else ''
-
     for rule in sorted(cfg.rules.keys()):
         desc, cat = RULES_META.get(rule, (rule, "Other"))
         enabled = cfg.rules.get(rule, True)
         categories.setdefault(cat, []).append((rule, desc, enabled))
+    return categories
 
-    cat_order = ["File", "Style", "Functions", "Exports", "Preprocessor",
-                 "Declarations", "Control", "Strict", "Formatting", "Other"]
+
+def _print_rules(use_color: bool = True):
+    """Print all rules grouped by category with descriptions."""
+    BOLD = '\033[1m' if use_color else ''
+    DIM = '\033[2m' if use_color else ''
+    RST = '\033[0m' if use_color else ''
+
+    categories = _group_rules(Config())
     first = True
-    for cat in cat_order:
+    for cat in CATEGORY_ORDER:
         if cat not in categories:
             continue
         if not first:
@@ -90,14 +94,12 @@ def _print_config(cfg: Config, use_color: bool = True):
     """Print current effective configuration as valid TOML with comments."""
     defaults = Config()
 
-    # Colors
     DIM = '\033[2m' if use_color else ''
     GREEN = '\033[32m' if use_color else ''
     RED = '\033[31m' if use_color else ''
     CYAN = '\033[36m' if use_color else ''
     RST = '\033[0m' if use_color else ''
 
-    # Build all lines first to calculate alignment
     limit_lines = [
         ("max_lines", cfg.max_lines, defaults.max_lines, "Max lines per function body"),
         ("max_args", cfg.max_args, defaults.max_args, "Max arguments per function"),
@@ -105,14 +107,8 @@ def _print_config(cfg: Config, use_color: bool = True):
         ("max_globals", cfg.max_globals, defaults.max_globals, "Max exported globals per file"),
     ]
 
-    # Rules by category
-    categories: dict[str, list[tuple[str, str, bool]]] = {}
-    for rule in sorted(cfg.rules.keys()):
-        desc, cat = RULES_META.get(rule, (rule, "Other"))
-        enabled = cfg.rules.get(rule, True)
-        categories.setdefault(cat, []).append((rule, desc, enabled))
+    categories = _group_rules(cfg)
 
-    # Calculate max widths
     limit_width = max(len(f"{name} = {val}") for name, val, _, _ in limit_lines)
     rule_width = max(len(f'"{rule}" = {str(en).lower()}') for rules in categories.values() for rule, _, en in rules)
     col = max(limit_width, rule_width) + 2
@@ -120,7 +116,6 @@ def _print_config(cfg: Config, use_color: bool = True):
     print(f"{DIM}# Effective configuration (copy to .epita-style.toml){RST}")
     print()
 
-    # Limits
     print(f"{DIM}# Limits{RST}")
     for name, val, default, desc in limit_lines:
         code = f"{name} = {val}"
@@ -131,8 +126,7 @@ def _print_config(cfg: Config, use_color: bool = True):
     print(f"{DIM}# Rules: true = enabled, false = disabled{RST}")
     print("[rules]")
 
-    for cat in ["File", "Style", "Functions", "Exports", "Preprocessor",
-                "Declarations", "Control", "Strict", "Formatting", "Other"]:
+    for cat in CATEGORY_ORDER:
         if cat not in categories:
             continue
         print(f"{DIM}# {cat}{RST}")
@@ -220,27 +214,10 @@ Exit codes:
     else:
         use_color = sys.stdout.isatty()
 
-    # Info commands (no paths required)
     if args.list_rules:
         _print_rules(use_color=use_color)
         return 0
 
-    if args.show_config:
-        cfg = load_config(
-            config_path=args.config,
-            preset=args.preset,
-            max_lines=args.max_lines,
-            max_args=args.max_args,
-            max_funcs=args.max_funcs,
-        )
-        _print_config(cfg, use_color=use_color)
-        return 0
-
-    # Require paths for checking
-    if not args.paths:
-        ap.error("PATH is required")
-
-    # Load config
     cfg = load_config(
         config_path=args.config,
         preset=args.preset,
@@ -249,9 +226,16 @@ Exit codes:
         max_funcs=args.max_funcs,
     )
 
-    # Colors
-    R, Y, C, W, B, RST = ('\033[91m', '\033[93m', '\033[96m', '\033[97m', '\033[1m', '\033[0m')
-    if not use_color:
+    if args.show_config:
+        _print_config(cfg, use_color=use_color)
+        return 0
+
+    if not args.paths:
+        ap.error("PATH is required")
+
+    if use_color:
+        R, Y, C, W, B, RST = '\033[91m', '\033[93m', '\033[96m', '\033[97m', '\033[1m', '\033[0m'
+    else:
         R = Y = C = W = B = RST = ''
 
     files = find_files(args.paths)

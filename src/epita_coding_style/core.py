@@ -52,21 +52,16 @@ class NodeCache:
         """Get all nodes of given types (cached)."""
         key = types
         if key not in self._cache:
-            self._cache[key] = list(_find_nodes(self.root, *types))
+            self._cache[key] = list(find_nodes(self.root, *types))
         return self._cache[key]
-
-
-def _find_nodes(node, *types):
-    """Yield all descendant nodes matching given types."""
-    if node.type in types:
-        yield node
-    for child in node.children:
-        yield from _find_nodes(child, *types)
 
 
 def find_nodes(node, *types):
     """Yield all descendant nodes matching given types."""
-    return _find_nodes(node, *types)
+    if node.type in types:
+        yield node
+    for child in node.children:
+        yield from find_nodes(child, *types)
 
 
 def text(node, content: bytes) -> str:

@@ -8,11 +8,10 @@ import shutil
 import subprocess
 
 from .config import Config
-from .core import Violation, Severity, NodeCache, text, find_id
+from .core import Violation, Severity, NodeCache, text, find_id, find_nodes
 
 # Pre-compiled regex patterns
 _CHAR_LITERAL = re.compile(r"'(?:\\.|[^'\\])'")
-_VLA_PATTERN = re.compile(r'\b\w+\s+\w+\s*\[\s*([a-z_]\w*)\s*\]')
 _CLANG_ERROR = re.compile(r'^.*:(\d+):\d+: (?:error|warning):')
 
 
@@ -83,10 +82,7 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
         if '{' in clean:
             pos = clean.find('{')
             before = clean[:pos].strip()
-            is_init = False
-            if '=' in before:
-                temp = before.replace('==', '').replace('!=', '').replace('<=', '').replace('>=', '')
-                is_init = '=' in temp
+            is_init = bool(re.search(r'(?<![!=<>])=(?!=)', before))
             if before and not is_init and clean.strip() not in ('{}', '{ }') and before != 'do':
                 if not line.rstrip().endswith('\\'):
                     col = line.find('{')
@@ -275,7 +271,6 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
 def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
     """Check misc rules (declarations, control structures, goto, cast)."""
     v = []
-    brace_depth = 0
 
     # AST-based check for multiple declarations on one line
     if cfg.is_enabled("decl.single"):
@@ -294,18 +289,31 @@ def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cf
                 v.append(Violation(path, line_num, "decl.single", "One declaration per line",
                                   line_content=line_content, column=col))
 
+    if cfg.is_enabled("decl.vla"):
+        for decl in nodes.get('declaration'):
+            for arr in find_nodes(decl, 'array_declarator'):
+                children = arr.children
+                size = None
+                in_brackets = False
+                for child in children:
+                    if child.type == '[':
+                        in_brackets = True
+                    elif child.type == ']':
+                        break
+                    elif in_brackets:
+                        size = child
+                if size is None:
+                    continue
+                size_text = text(size, content)
+                if size.type == 'identifier' and not size_text.isupper():
+                    line_num = arr.start_point[0] + 1
+                    col = arr.start_point[1]
+                    line_content = lines[arr.start_point[0]] if arr.start_point[0] < len(lines) else None
+                    v.append(Violation(path, line_num, "decl.vla", "VLA not allowed",
+                                      line_content=line_content, column=col))
+
     for i, line in enumerate(lines, 1):
         s = line.strip()
-        brace_depth += line.count('{') - line.count('}')
-
-        if cfg.is_enabled("decl.vla"):
-            in_block = brace_depth > 0 or ('{' in s and '}' in s)
-            if in_block:
-                m = _VLA_PATTERN.search(s)
-                if m and '=' not in s and not m.group(1).isupper():
-                    col = line.find('[')
-                    v.append(Violation(path, i, "decl.vla", "VLA not allowed",
-                                      line_content=line, column=col))
 
         if cfg.is_enabled("stat.asm"):
             if any(kw in s for kw in ['asm(', '__asm__', '__asm']):
