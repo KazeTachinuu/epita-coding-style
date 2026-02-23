@@ -203,8 +203,9 @@ def check_exports(path: str, nodes: NodeCache, content: bytes, cfg: Config) -> l
             is_static = any(text(c, content) == 'static' for c in func.children if c.type == 'storage_class_specifier')
             if not is_static:
                 for child in func.children:
-                    if child.type == 'function_declarator':
-                        if name := find_id(child, content):
+                    func_decl = _find_function_declarator(child)
+                    if func_decl:
+                        if name := find_id(func_decl, content):
                             exported.append(name)
 
         if len(exported) > cfg.max_funcs:
@@ -226,7 +227,8 @@ def check_exports(path: str, nodes: NodeCache, content: bytes, cfg: Config) -> l
                     globals_found.append((name, decl.start_point[0] + 1))
 
         if len(globals_found) > cfg.max_globals:
-            v.append(Violation(path, globals_found[1][1], "export.other",
+            first_excess = globals_found[cfg.max_globals]
+            v.append(Violation(path, first_excess[1], "export.other",
                               f"{len(globals_found)} exported globals (max {cfg.max_globals})"))
 
     return v

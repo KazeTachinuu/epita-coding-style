@@ -186,8 +186,9 @@ class Config:
         cfg.rules["fun.proto.void"] = False
         cfg.rules["keyword.goto"] = False
         cfg.rules["cast"] = False
-        # CXX uses 50-line max
-        cfg.max_lines = 50
+        # CXX uses 50-line max (only if user hasn't overridden)
+        if cfg.max_lines == Config().max_lines:
+            cfg.max_lines = 50
         return cfg
 
 

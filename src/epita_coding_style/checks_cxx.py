@@ -128,17 +128,6 @@ def _check_include_order(path: str, lines: list[str], nodes: NodeCache,
                                "Same-name header should be included first",
                                line_content=lines[self_incs[0][0] - 1] if self_incs[0][0] <= len(lines) else None))
 
-    # Check system before local (after self)
-    last_system = -1
-    for line_num, kind, _ in includes:
-        if kind == 'self':
-            continue
-        if kind == 'system':
-            last_system = line_num
-        elif kind == 'local' and last_system == -1:
-            # local before any system is ok if no system includes exist
-            pass
-
     # Find first local that comes before a system include
     for i, (line_num, kind, _) in enumerate(includes):
         if kind == 'local':
