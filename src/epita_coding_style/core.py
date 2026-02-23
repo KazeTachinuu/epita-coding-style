@@ -109,6 +109,11 @@ def text(node, content: bytes) -> str:
     return content[node.start_byte:node.end_byte].decode()
 
 
+def line_at(lines: list[str], index: int) -> str | None:
+    """Get line content at 0-based index, or None if out of bounds."""
+    return lines[index] if index < len(lines) else None
+
+
 def find_id(node, content: bytes) -> str | None:
     """Recursively find first identifier in a node."""
     if node.type == 'identifier':

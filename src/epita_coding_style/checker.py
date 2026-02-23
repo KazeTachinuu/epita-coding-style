@@ -18,6 +18,8 @@ from .checks import (
     check_exports,
     check_preprocessor,
     check_misc,
+    check_vla,
+    check_ctrl_empty,
     check_clang_format,
 )
 from .checks_cxx import (
@@ -63,6 +65,8 @@ def _check_c_file(path: str, cfg: Config, content: str, lines: list[str],
         check_exports(path, nodes, content_bytes, cfg) +
         check_preprocessor(path, lines, cfg) +
         check_misc(path, nodes, content_bytes, lines, cfg) +
+        check_vla(path, nodes, content_bytes, lines, cfg) +
+        check_ctrl_empty(path, lines, cfg) +
         check_clang_format(path, cfg)
     )
 

@@ -8,7 +8,7 @@ import shutil
 import subprocess
 
 from .config import Config
-from .core import Violation, Severity, NodeCache, text, find_id, find_nodes
+from .core import Violation, Severity, NodeCache, text, find_id, find_nodes, line_at, C_EXTS, Lang, lang_from_path
 
 # Pre-compiled regex patterns
 _CHAR_LITERAL = re.compile(r"'(?:\\.|[^'\\])'")
@@ -127,7 +127,7 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
 
     for func in nodes.get('function_definition'):
         line_num = func.start_point[0] + 1
-        line_content = lines[func.start_point[0]] if func.start_point[0] < len(lines) else None
+        line_content = line_at(lines, func.start_point[0])
         name = None
         params = []
         body = None
@@ -157,12 +157,7 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
                               line_content=line_content))
 
         if cfg.is_enabled("fun.length") and body:
-            count = 0
-            for ln in range(body.start_point[0], body.end_point[0] + 1):
-                if ln < len(lines):
-                    s = lines[ln].strip()
-                    if s and s not in ('{', '}') and not s.startswith(('//', '/*', '*')):
-                        count += 1
+            count = count_function_lines(body, lines)
             if count > cfg.max_lines:
                 v.append(Violation(path, line_num, "fun.length", f"Function has {count} lines (max {cfg.max_lines})",
                                   line_content=line_content))
@@ -182,7 +177,7 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
 
                     if name:
                         line_num = child.start_point[0] + 1
-                        line_content = lines[child.start_point[0]] if child.start_point[0] < len(lines) else None
+                        line_content = line_at(lines, child.start_point[0])
                         decl_text = text(child, content)
                         if cfg.is_enabled("fun.proto.void"):
                             if not params and ('()' in decl_text or '( )' in decl_text):
@@ -268,6 +263,69 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
     return v
 
 
+def check_vla(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
+    """Check for variable-length arrays. Shared between C and C++."""
+    if not cfg.is_enabled("decl.vla"):
+        return []
+    v = []
+    for decl in nodes.get('declaration'):
+        for arr in find_nodes(decl, 'array_declarator'):
+            children = arr.children
+            in_brackets = False
+            size = None
+            for child in children:
+                if child.type == '[':
+                    in_brackets = True
+                elif child.type == ']':
+                    break
+                elif in_brackets:
+                    size = child
+            if size is None:
+                continue
+            size_text = text(size, content)
+            if size.type == 'identifier' and not size_text.isupper():
+                line_num = arr.start_point[0] + 1
+                v.append(Violation(path, line_num, "decl.vla", "VLA not allowed",
+                                  line_content=line_at(lines, arr.start_point[0]),
+                                  column=arr.start_point[1]))
+    return v
+
+
+def check_ctrl_empty(path: str, lines: list[str], cfg: Config) -> list[Violation]:
+    """Check for empty loop bodies. Shared between C and C++."""
+    if not cfg.is_enabled("ctrl.empty"):
+        return []
+    v = []
+    for i, line in enumerate(lines, 1):
+        s = line.strip()
+        if s == ';' and i > 1:
+            prev = lines[i - 2].strip()
+            if prev.startswith(('for', 'while')):
+                v.append(Violation(path, i, "ctrl.empty", "Use 'continue' for empty loops",
+                                  line_content=line))
+    return v
+
+
+def count_function_lines(body, lines: list[str]) -> int:
+    """Count non-trivial lines in a function body. Shared between C and C++."""
+    count = 0
+    for ln in range(body.start_point[0], body.end_point[0] + 1):
+        if ln < len(lines):
+            s = lines[ln].strip()
+            if s and s not in ('{', '}') and not s.startswith(('//', '/*', '*')):
+                count += 1
+    return count
+
+
+def _clang_format_candidates(lang: Lang | None) -> list[str]:
+    """Return ordered list of clang-format config filenames for a language."""
+    if lang == Lang.C:
+        return [".clang-format-c", ".clang-format"]
+    elif lang == Lang.CXX:
+        return [".clang-format-cxx", ".clang-format"]
+    return [".clang-format"]
+
+
 def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
     """Check misc rules (declarations, control structures, goto, cast)."""
     v = []
@@ -283,34 +341,11 @@ def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cf
                          if c.type in ('init_declarator', 'pointer_declarator', 'identifier', 'array_declarator')]
             if len(declarators) > 1:
                 line_num = decl.start_point[0] + 1
-                line_content = lines[decl.start_point[0]] if decl.start_point[0] < len(lines) else None
+                line_content = line_at(lines, decl.start_point[0])
                 # Find the comma within the declaration span, not the whole line
                 col = decl.start_point[1]  # Point to start of declaration
                 v.append(Violation(path, line_num, "decl.single", "One declaration per line",
                                   line_content=line_content, column=col))
-
-    if cfg.is_enabled("decl.vla"):
-        for decl in nodes.get('declaration'):
-            for arr in find_nodes(decl, 'array_declarator'):
-                children = arr.children
-                size = None
-                in_brackets = False
-                for child in children:
-                    if child.type == '[':
-                        in_brackets = True
-                    elif child.type == ']':
-                        break
-                    elif in_brackets:
-                        size = child
-                if size is None:
-                    continue
-                size_text = text(size, content)
-                if size.type == 'identifier' and not size_text.isupper():
-                    line_num = arr.start_point[0] + 1
-                    col = arr.start_point[1]
-                    line_content = lines[arr.start_point[0]] if arr.start_point[0] < len(lines) else None
-                    v.append(Violation(path, line_num, "decl.vla", "VLA not allowed",
-                                      line_content=line_content, column=col))
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
@@ -320,41 +355,39 @@ def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cf
                 v.append(Violation(path, i, "stat.asm", "asm not allowed",
                                   line_content=line))
 
-        if cfg.is_enabled("ctrl.empty"):
-            if s == ';' and i > 1:
-                prev = lines[i-2].strip()
-                if prev.startswith(('for', 'while')):
-                    v.append(Violation(path, i, "ctrl.empty", "Use 'continue' for empty loops",
-                                      line_content=line))
-
     # AST-based checks for goto and cast
     if cfg.is_enabled("keyword.goto"):
         for node in nodes.get('goto_statement'):
             line_num = node.start_point[0] + 1
-            line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
             v.append(Violation(path, line_num, "keyword.goto", "goto not allowed",
-                              line_content=line_content, column=node.start_point[1]))
+                              line_content=line_at(lines, node.start_point[0]), column=node.start_point[1]))
 
     if cfg.is_enabled("cast"):
         for node in nodes.get('cast_expression'):
             line_num = node.start_point[0] + 1
-            line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
             v.append(Violation(path, line_num, "cast", "Explicit cast not allowed",
-                              line_content=line_content, column=node.start_point[1]))
+                              line_content=line_at(lines, node.start_point[0]), column=node.start_point[1]))
 
     return v
 
 
-def _find_clang_format_config(start_path: str) -> str | None:
-    """Find .clang-format file by walking up from start_path."""
+def _find_clang_format_config(start_path: str, lang: Lang | None = None) -> str | None:
+    """Find .clang-format config file by walking up from start_path.
+
+    Looks for language-specific configs first (.clang-format-c / .clang-format-cxx),
+    then falls back to the generic .clang-format.
+    """
+    suffixes = _clang_format_candidates(lang)
+
     path = os.path.abspath(start_path)
     if os.path.isfile(path):
         path = os.path.dirname(path)
 
     while path != os.path.dirname(path):  # Stop at root
-        config = os.path.join(path, ".clang-format")
-        if os.path.isfile(config):
-            return config
+        for suffix in suffixes:
+            config = os.path.join(path, suffix)
+            if os.path.isfile(config):
+                return config
         path = os.path.dirname(path)
     return None
 
@@ -367,12 +400,18 @@ def check_clang_format(path: str, cfg: Config) -> list[Violation]:
     if not shutil.which("clang-format"):
         return []
 
-    # Find .clang-format config
-    config_file = _find_clang_format_config(path)
+    lang = lang_from_path(path)
+
+    # Find language-specific .clang-format config
+    config_file = _find_clang_format_config(path, lang)
     if not config_file:
-        pkg_config = os.path.join(os.path.dirname(__file__), ".clang-format")
-        if os.path.isfile(pkg_config):
-            config_file = pkg_config
+        # Fallback to bundled package configs
+        pkg_dir = os.path.dirname(__file__)
+        for name in _clang_format_candidates(lang):
+            pkg_config = os.path.join(pkg_dir, name)
+            if os.path.isfile(pkg_config):
+                config_file = pkg_config
+                break
 
     if not config_file:
         return []

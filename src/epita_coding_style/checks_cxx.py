@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 
 from .config import Config
-from .core import Violation, Severity, NodeCache, text, find_id, find_nodes
+from .core import Violation, Severity, NodeCache, text, find_id, find_nodes, line_at
+from .checks import check_vla, check_ctrl_empty, count_function_lines
 
 # C standard headers that should be replaced with C++ equivalents
 _C_HEADERS = {
@@ -63,7 +64,7 @@ def check_cxx_preprocessor(path: str, lines: list[str], content_bytes: bytes,
                             line_num = inc.start_point[0] + 1
                             v.append(Violation(path, line_num, "cpp.include.filetype",
                                                f"Don't include source file '{fname}'",
-                                               line_content=lines[inc.start_point[0]] if inc.start_point[0] < len(lines) else None))
+                                               line_content=line_at(lines, inc.start_point[0])))
                             break
 
     # include.order: same-name header first, then system, then local
@@ -88,7 +89,7 @@ def check_cxx_preprocessor(path: str, lines: list[str], content_bytes: bytes,
                             v.append(Violation(path, line_num, "cpp.constexpr",
                                                "Consider using constexpr for compile-time constant",
                                                Severity.MINOR,
-                                               line_content=lines[decl.start_point[0]] if decl.start_point[0] < len(lines) else None))
+                                               line_content=line_at(lines, decl.start_point[0])))
                             break
 
     return v
@@ -160,7 +161,7 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
     if cfg.is_enabled("global.casts"):
         for node in nodes.get('cast_expression'):
             line_num = node.start_point[0] + 1
-            line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+            line_content = line_at(lines, node.start_point[0])
             v.append(Violation(path, line_num, "global.casts",
                                "Use C++ casts (static_cast, etc.) instead of C-style casts",
                                line_content=line_content, column=node.start_point[1]))
@@ -173,7 +174,7 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
                 fname = text(func_node, content_bytes)
                 if fname in _MALLOC_FUNCS:
                     line_num = node.start_point[0] + 1
-                    line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+                    line_content = line_at(lines, node.start_point[0])
                     v.append(Violation(path, line_num, "global.memory.no_malloc",
                                        f"Don't use {fname}(), use new/delete or smart pointers",
                                        line_content=line_content, column=node.start_point[1]))
@@ -186,7 +187,7 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
             node_text = text(node, content_bytes)
             if node_text == 'NULL':
                 line_num = node.start_point[0] + 1
-                line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+                line_content = line_at(lines, node.start_point[0])
                 v.append(Violation(path, line_num, "global.nullptr",
                                    "Use nullptr instead of NULL",
                                    line_content=line_content, column=node.start_point[1]))
@@ -195,7 +196,7 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
     if cfg.is_enabled("c.extern"):
         for node in nodes.get('linkage_specification'):
             line_num = node.start_point[0] + 1
-            line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+            line_content = line_at(lines, node.start_point[0])
             v.append(Violation(path, line_num, "c.extern",
                                'No extern "C" in C++ code',
                                line_content=line_content, column=node.start_point[1]))
@@ -209,7 +210,7 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
                     if header in _C_HEADERS:
                         line_num = inc.start_point[0] + 1
                         cxx_header = 'c' + header.replace('.h', '')
-                        line_content = lines[inc.start_point[0]] if inc.start_point[0] < len(lines) else None
+                        line_content = line_at(lines, inc.start_point[0])
                         v.append(Violation(path, line_num, "c.headers",
                                            f"Use <{cxx_header}> instead of <{header}>",
                                            line_content=line_content))
@@ -222,7 +223,7 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
                 fname = text(func_node, content_bytes)
                 if fname in _C_FUNCTIONS and fname not in _MALLOC_FUNCS:
                     line_num = node.start_point[0] + 1
-                    line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+                    line_content = line_at(lines, node.start_point[0])
                     v.append(Violation(path, line_num, "c.std_functions",
                                        f"Use std::{fname} instead of {fname}",
                                        line_content=line_content, column=node.start_point[1]))
@@ -243,7 +244,7 @@ def check_cxx_naming(path: str, lines: list[str], content_bytes: bytes,
                     name = text(child, content_bytes)
                     if not _CAMEL_CASE.match(name):
                         line_num = child.start_point[0] + 1
-                        line_content = lines[child.start_point[0]] if child.start_point[0] < len(lines) else None
+                        line_content = line_at(lines, child.start_point[0])
                         v.append(Violation(path, line_num, "naming.class",
                                            f"Class/struct '{name}' should be CamelCase",
                                            line_content=line_content, column=child.start_point[1]))
@@ -257,7 +258,7 @@ def check_cxx_naming(path: str, lines: list[str], content_bytes: bytes,
                     name = text(child, content_bytes)
                     if not _LOWER_NS.match(name):
                         line_num = child.start_point[0] + 1
-                        line_content = lines[child.start_point[0]] if child.start_point[0] < len(lines) else None
+                        line_content = line_at(lines, child.start_point[0])
                         v.append(Violation(path, line_num, "naming.namespace",
                                            f"Namespace '{name}' should be lowercase",
                                            line_content=line_content, column=child.start_point[1]))
@@ -295,28 +296,8 @@ def check_cxx_declarations(path: str, lines: list[str], content_bytes: bytes,
     if cfg.is_enabled("decl.ctor.explicit"):
         v.extend(_check_explicit_ctors(path, lines, content_bytes, nodes))
 
-    # decl.vla: no variable-length arrays (reuse logic from checks.py)
-    if cfg.is_enabled("decl.vla"):
-        for decl in nodes.get('declaration'):
-            for arr in find_nodes(decl, 'array_declarator'):
-                children = arr.children
-                in_brackets = False
-                size = None
-                for child in children:
-                    if child.type == '[':
-                        in_brackets = True
-                    elif child.type == ']':
-                        break
-                    elif in_brackets:
-                        size = child
-                if size is None:
-                    continue
-                size_text = text(size, content_bytes)
-                if size.type == 'identifier' and not size_text.isupper():
-                    line_num = arr.start_point[0] + 1
-                    line_content = lines[arr.start_point[0]] if arr.start_point[0] < len(lines) else None
-                    v.append(Violation(path, line_num, "decl.vla", "VLA not allowed",
-                                      line_content=line_content, column=arr.start_point[1]))
+    # decl.vla: no variable-length arrays (shared helper)
+    v.extend(check_vla(path, nodes, content_bytes, lines, cfg))
 
     return v
 
@@ -432,7 +413,7 @@ def _check_explicit_ctors(path: str, lines: list[str], content_bytes: bytes,
                 # Single-arg constructors need explicit (unless already explicit)
                 if len(params) == 1 and not is_explicit:
                     line_num = decl.start_point[0] + 1
-                    line_content = lines[decl.start_point[0]] if decl.start_point[0] < len(lines) else None
+                    line_content = line_at(lines, decl.start_point[0])
                     v.append(Violation(path, line_num, "decl.ctor.explicit",
                                        f"Single-argument constructor '{class_name}' should be explicit",
                                        Severity.MINOR,
@@ -457,7 +438,7 @@ def check_cxx_control(path: str, lines: list[str], content_bytes: bytes,
                     break
             if not has_default:
                 line_num = sw.start_point[0] + 1
-                line_content = lines[sw.start_point[0]] if sw.start_point[0] < len(lines) else None
+                line_content = line_at(lines, sw.start_point[0])
                 v.append(Violation(path, line_num, "ctrl.switch",
                                    "Switch statement should have a default case",
                                    line_content=line_content))
@@ -476,16 +457,8 @@ def check_cxx_control(path: str, lines: list[str], content_bytes: bytes,
                                            line_content=lines[line_idx], column=col))
                     break
 
-    # ctrl.empty: empty loop bodies should use continue (shared with C but check in CXX too)
-    if cfg.is_enabled("ctrl.empty"):
-        for i, line in enumerate(lines, 1):
-            s = line.strip()
-            if s == ';' and i > 1:
-                prev = lines[i - 2].strip()
-                if prev.startswith(('for', 'while')):
-                    v.append(Violation(path, i, "ctrl.empty",
-                                       "Use 'continue' for empty loops",
-                                       line_content=line))
+    # ctrl.empty: empty loop bodies should use continue (shared helper)
+    v.extend(check_ctrl_empty(path, lines, cfg))
 
     return v
 
@@ -510,7 +483,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
                 if child.type in ('number_literal', 'string_literal', 'char_literal',
                                   'true', 'false', 'null', 'nullptr'):
                     line_num = node.start_point[0] + 1
-                    line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+                    line_content = line_at(lines, node.start_point[0])
                     v.append(Violation(path, line_num, "err.throw",
                                        "Don't throw literals, throw exception objects",
                                        line_content=line_content, column=node.start_point[1]))
@@ -525,7 +498,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
                             param_text = text(param, content_bytes)
                             if '&' not in param_text and param_text != '...':
                                 line_num = param.start_point[0] + 1
-                                line_content = lines[param.start_point[0]] if param.start_point[0] < len(lines) else None
+                                line_content = line_at(lines, param.start_point[0])
                                 v.append(Violation(path, line_num, "err.throw.catch",
                                                    "Catch exceptions by reference",
                                                    Severity.MINOR,
@@ -537,7 +510,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
             for child in node.children:
                 if child.type == 'parenthesized_expression':
                     line_num = node.start_point[0] + 1
-                    line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+                    line_content = line_at(lines, node.start_point[0])
                     v.append(Violation(path, line_num, "err.throw.paren",
                                        "No parentheses after throw",
                                        line_content=line_content, column=node.start_point[1]))
@@ -558,25 +531,16 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
     if cfg.is_enabled("fun.length"):
         for func in nodes.get('function_definition'):
             body = None
-            name = None
             for child in func.children:
                 if child.type == 'compound_statement':
                     body = child
-                elif child.type == 'function_declarator':
-                    name = find_id(child, content_bytes)
             if body:
-                count = 0
-                for ln in range(body.start_point[0], body.end_point[0] + 1):
-                    if ln < len(lines):
-                        s = lines[ln].strip()
-                        if s and s not in ('{', '}') and not s.startswith(('//', '/*', '*')):
-                            count += 1
+                count = count_function_lines(body, lines)
                 if count > cfg.max_lines:
                     line_num = func.start_point[0] + 1
-                    line_content = lines[func.start_point[0]] if func.start_point[0] < len(lines) else None
                     v.append(Violation(path, line_num, "fun.length",
                                        f"Function has {count} lines (max {cfg.max_lines})",
-                                       line_content=line_content))
+                                       line_content=line_at(lines, func.start_point[0])))
 
     # op.assign: assignment operators should return Class& and *this
     if cfg.is_enabled("op.assign"):
@@ -597,7 +561,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
             has_class = any(child.type == 'class' for child in node.children)
             if not has_class:
                 line_num = node.start_point[0] + 1
-                line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+                line_content = line_at(lines, node.start_point[0])
                 v.append(Violation(path, line_num, "enum.class",
                                    "Prefer 'enum class' over plain 'enum'",
                                    Severity.MINOR,
@@ -617,7 +581,7 @@ def _check_empty_braces(path: str, lines: list[str], content_bytes: bytes,
             # Check if { and } are on different lines
             if node.start_point[0] != node.end_point[0]:
                 line_num = node.start_point[0] + 1
-                line_content = lines[node.start_point[0]] if node.start_point[0] < len(lines) else None
+                line_content = line_at(lines, node.start_point[0])
                 v.append(Violation(path, line_num, "braces.empty",
                                    "Empty body should use {} on the same line",
                                    line_content=line_content))
@@ -638,7 +602,7 @@ def _check_single_exp_braces(path: str, lines: list[str], content_bytes: bytes,
 
         if body and body.type != 'compound_statement':
             line_num = body.start_point[0] + 1
-            line_content = lines[body.start_point[0]] if body.start_point[0] < len(lines) else None
+            line_content = line_at(lines, body.start_point[0])
             v.append(Violation(path, line_num, "braces.single_exp",
                                "Single-expression block should have braces",
                                Severity.MINOR,
@@ -721,7 +685,7 @@ def _check_void_in_func_decl(path: str, lines: list[str], content_bytes: bytes,
                 if param_text == 'void':
                     line_num = func_decl.start_point[0] + 1
                     name = find_id(func_decl, content_bytes)
-                    line_content = lines[func_decl.start_point[0]] if func_decl.start_point[0] < len(lines) else None
+                    line_content = line_at(lines, func_decl.start_point[0])
                     v.append(Violation(path, line_num, "fun.proto.void.cxx",
                                        f"'{name or '?'}' should use () not (void) in C++",
                                        line_content=line_content))
@@ -745,7 +709,7 @@ def _check_op_assign(path: str, lines: list[str], content_bytes: bytes,
 
         if not has_ref_return:
             line_num = func.start_point[0] + 1
-            line_content = lines[func.start_point[0]] if func.start_point[0] < len(lines) else None
+            line_content = line_at(lines, func.start_point[0])
             v.append(Violation(path, line_num, "op.assign",
                                "Assignment operator should return Class&",
                                line_content=line_content))
@@ -761,7 +725,7 @@ def _check_op_assign(path: str, lines: list[str], content_bytes: bytes,
             body_text = text(body, content_bytes)
             if 'return *this' not in body_text and 'return *this;' not in body_text:
                 line_num = func.start_point[0] + 1
-                line_content = lines[func.start_point[0]] if func.start_point[0] < len(lines) else None
+                line_content = line_at(lines, func.start_point[0])
                 v.append(Violation(path, line_num, "op.assign",
                                    "Assignment operator should return *this",
                                    line_content=line_content))
@@ -785,7 +749,7 @@ def _check_forbidden_overloads(path: str, lines: list[str], content_bytes: bytes
                     # Check the operator name precisely
                     if op + '(' in fd_text or op + ' (' in fd_text:
                         line_num = fd.start_point[0] + 1
-                        line_content = lines[fd.start_point[0]] if fd.start_point[0] < len(lines) else None
+                        line_content = line_at(lines, fd.start_point[0])
                         v.append(Violation(path, line_num, rule,
                                            f"Don't overload {op}",
                                            severity,
