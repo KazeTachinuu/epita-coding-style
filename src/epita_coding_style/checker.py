@@ -238,7 +238,7 @@ Exit codes:
     # Limits
     lim_group = ap.add_argument_group('Limits')
     lim_group.add_argument('--max-lines', type=int, metavar='N',
-                           help='max lines per function body [default: 30]')
+                           help='max lines per function body [default: 30, C++ auto: 50]')
     lim_group.add_argument('--max-args', type=int, metavar='N',
                            help='max arguments per function [default: 4]')
     lim_group.add_argument('--max-funcs', type=int, metavar='N',
