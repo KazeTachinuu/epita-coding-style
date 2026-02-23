@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "epita-coding-style"
-version = "2.4.2"
-description = "EPITA C Coding Style Checker - validates C code against EPITA coding standards"
+version = "3.0.0"
+description = "EPITA C/C++ Coding Style Checker - validates C and C++ code against EPITA coding standards"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -24,12 +24,14 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C",
+    "Programming Language :: C++",
     "Topic :: Software Development :: Quality Assurance",
 ]
-keywords = ["c", "coding-style", "linter", "epita", "checker"]
+keywords = ["c", "c++", "coding-style", "linter", "epita", "checker"]
 dependencies = [
     "tree-sitter>=0.23.0",
     "tree-sitter-c>=0.23.0",
+    "tree-sitter-cpp>=0.23.0",
     "tomli>=2.0.0; python_version < '3.11'",
 ]
 

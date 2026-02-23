@@ -1,4 +1,4 @@
-"""Configuration system for EPITA C Coding Style Checker."""
+"""Configuration system for EPITA C/C++ Coding Style Checker."""
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,6 +43,43 @@ RULES_META: dict[str, tuple[str, str]] = {
     "cast": ("No explicit casts", "Strict"),
     # Formatting
     "format": ("clang-format compliance check", "Formatting"),
+    # CXX-File
+    "file.ext": ("C++ files must use .cc/.hh/.hxx extensions (not .cpp/.hpp)", "CXX-File"),
+    # CXX-Preprocessor
+    "cpp.pragma.once": ("Use #pragma once instead of include guards", "CXX-Preprocessor"),
+    "cpp.include.filetype": ("Only include .hh/.hxx files (no source files)", "CXX-Preprocessor"),
+    "cpp.include.order": ("Includes ordered: same-name header, system, local", "CXX-Preprocessor"),
+    "cpp.constexpr": ("Compile-time constants should use constexpr", "CXX-Preprocessor"),
+    # CXX-Global
+    "global.casts": ("Must use C++ casts (static_cast etc.), not C-style", "CXX-Global"),
+    "global.memory.no_malloc": ("No malloc/calloc/realloc/free", "CXX-Global"),
+    "global.nullptr": ("Use nullptr, not NULL", "CXX-Global"),
+    "c.extern": ("No extern \"C\"", "CXX-Global"),
+    "c.headers": ("No C headers (use <cstdio> not <stdio.h>)", "CXX-Global"),
+    "c.std_functions": ("Use std:: equivalents", "CXX-Global"),
+    # CXX-Naming
+    "naming.class": ("CamelCase class/struct names", "CXX-Naming"),
+    "naming.namespace": ("Lowercase namespaces, closing comment", "CXX-Naming"),
+    # CXX-Declarations
+    "decl.ref": ("& next to type, not variable", "CXX-Declarations"),
+    "decl.ctor.explicit": ("Single-arg constructors should be explicit", "CXX-Declarations"),
+    "decl.point": ("* next to type, not variable", "CXX-Declarations"),
+    # CXX-Control
+    "ctrl.switch": ("Default case rules for switch", "CXX-Control"),
+    "ctrl.switch.padding": ("No space before label colon", "CXX-Control"),
+    # CXX-Writing
+    "braces.empty": ("{} on same line for empty bodies", "CXX-Writing"),
+    "braces.single_exp": ("Prefer braces for single-expression blocks", "CXX-Writing"),
+    "err.throw": ("Don't throw literals", "CXX-Writing"),
+    "err.throw.catch": ("Catch by reference", "CXX-Writing"),
+    "err.throw.paren": ("No parentheses after throw", "CXX-Writing"),
+    "exp.padding": ("No space in operator keyword (operator++ not operator ++)", "CXX-Writing"),
+    "exp.linebreak": ("Line breaks before binary operators", "CXX-Writing"),
+    "fun.proto.void.cxx": ("MUST NOT use void in C++ empty params", "CXX-Writing"),
+    "op.assign": ("Return Class& and *this from assignment operators", "CXX-Writing"),
+    "op.overload": ("Don't overload operator,, operator||, operator&&", "CXX-Writing"),
+    "op.overload.binand": ("Don't overload operator&", "CXX-Writing"),
+    "enum.class": ("Prefer enum class over plain enum", "CXX-Writing"),
 }
 
 
@@ -88,11 +125,70 @@ class Config:
         "cast": True,
         # Formatting (uses clang-format)
         "format": True,
+        # CXX rules (disabled by default, enabled when checking C++ files)
+        "file.ext": False,
+        "cpp.pragma.once": False,
+        "cpp.include.filetype": False,
+        "cpp.include.order": False,
+        "cpp.constexpr": False,
+        "global.casts": False,
+        "global.memory.no_malloc": False,
+        "global.nullptr": False,
+        "c.extern": False,
+        "c.headers": False,
+        "c.std_functions": False,
+        "naming.class": False,
+        "naming.namespace": False,
+        "decl.ref": False,
+        "decl.ctor.explicit": False,
+        "decl.point": False,
+        "ctrl.switch": False,
+        "ctrl.switch.padding": False,
+        "braces.empty": False,
+        "braces.single_exp": False,
+        "err.throw": False,
+        "err.throw.catch": False,
+        "err.throw.paren": False,
+        "exp.padding": False,
+        "exp.linebreak": False,
+        "fun.proto.void.cxx": False,
+        "op.assign": False,
+        "op.overload": False,
+        "op.overload.binand": False,
+        "enum.class": False,
     })
 
     def is_enabled(self, rule: str) -> bool:
         """Check if a rule is enabled."""
         return self.rules.get(rule, True)
+
+    def with_cxx(self) -> "Config":
+        """Return a copy with CXX rules enabled and C-only rules disabled."""
+        import copy
+        cfg = copy.deepcopy(self)
+        cxx_rules = [
+            "file.ext",
+            "cpp.pragma.once", "cpp.include.filetype", "cpp.include.order",
+            "cpp.constexpr", "global.casts", "global.memory.no_malloc",
+            "global.nullptr", "c.extern", "c.headers", "c.std_functions",
+            "naming.class", "naming.namespace", "decl.ref", "decl.ctor.explicit",
+            "decl.point", "ctrl.switch", "ctrl.switch.padding",
+            "braces.empty", "braces.single_exp", "err.throw", "err.throw.catch",
+            "err.throw.paren", "exp.padding", "exp.linebreak", "fun.proto.void.cxx",
+            "op.assign", "op.overload", "op.overload.binand", "enum.class",
+        ]
+        for rule in cxx_rules:
+            cfg.rules[rule] = True
+        # Disable C-only rules
+        cfg.rules["cpp.guard"] = False
+        cfg.rules["export.fun"] = False
+        cfg.rules["export.other"] = False
+        cfg.rules["fun.proto.void"] = False
+        cfg.rules["keyword.goto"] = False
+        cfg.rules["cast"] = False
+        # CXX uses 50-line max
+        cfg.max_lines = 50
+        return cfg
 
 
 # Presets (override defaults)

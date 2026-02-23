@@ -4,11 +4,35 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 
 class Severity(Enum):
     MAJOR = "MAJOR"
     MINOR = "MINOR"
+
+
+class Lang(Enum):
+    C = "C"
+    CXX = "CXX"
+
+
+# File extension to language mapping
+_EXT_LANG = {
+    '.c': Lang.C, '.h': Lang.C,
+    '.cc': Lang.CXX, '.hh': Lang.CXX, '.hxx': Lang.CXX,
+    '.cpp': Lang.CXX, '.hpp': Lang.CXX,
+}
+
+C_EXTS = ('.c', '.h')
+CXX_EXTS = ('.cc', '.hh', '.hxx')
+CXX_BAD_EXTS = ('.cpp', '.hpp')
+ALL_EXTS = C_EXTS + CXX_EXTS + CXX_BAD_EXTS
+
+
+def lang_from_path(path: str) -> Lang | None:
+    """Detect language from file extension."""
+    return _EXT_LANG.get(Path(path).suffix)
 
 
 @dataclass
@@ -22,23 +46,39 @@ class Violation:
     column: int | None = None
 
 
-# Lazy-loaded parser
-_parser = None
+# Lazy-loaded parsers
+_c_parser = None
+_cpp_parser = None
 
 
-def _get_parser():
-    """Get or create the tree-sitter parser."""
-    global _parser
-    if _parser is None:
+def _get_c_parser():
+    """Get or create the C tree-sitter parser."""
+    global _c_parser
+    if _c_parser is None:
         from tree_sitter import Language, Parser
         import tree_sitter_c as tsc
-        _parser = Parser(Language(tsc.language()))
-    return _parser
+        _c_parser = Parser(Language(tsc.language()))
+    return _c_parser
+
+
+def _get_cpp_parser():
+    """Get or create the C++ tree-sitter parser."""
+    global _cpp_parser
+    if _cpp_parser is None:
+        from tree_sitter import Language, Parser
+        import tree_sitter_cpp as tscpp
+        _cpp_parser = Parser(Language(tscpp.language()))
+    return _cpp_parser
 
 
 def parse(content: bytes):
     """Parse C code and return AST root."""
-    return _get_parser().parse(content).root_node
+    return _get_c_parser().parse(content).root_node
+
+
+def parse_cpp(content: bytes):
+    """Parse C++ code and return AST root."""
+    return _get_cpp_parser().parse(content).root_node
 
 
 class NodeCache:

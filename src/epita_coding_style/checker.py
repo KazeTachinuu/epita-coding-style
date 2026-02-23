@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EPITA C Coding Style Checker - main entry point."""
+"""EPITA C/C++ Coding Style Checker - main entry point."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import Config, PRESETS, RULES_META, load_config
-from .core import Violation, Severity, parse, NodeCache
+from .core import Violation, Severity, parse, parse_cpp, NodeCache, Lang, lang_from_path, ALL_EXTS, C_EXTS, CXX_EXTS, CXX_BAD_EXTS
 from .checks import (
     check_file_format,
     check_braces,
@@ -20,10 +20,22 @@ from .checks import (
     check_misc,
     check_clang_format,
 )
+from .checks_cxx import (
+    check_cxx_preprocessor,
+    check_cxx_globals,
+    check_cxx_naming,
+    check_cxx_declarations,
+    check_cxx_control,
+    check_cxx_writing,
+)
 
 
 def check_file(path: str, cfg: Config) -> list[Violation]:
-    """Run all checks on a file."""
+    """Run all checks on a file, dispatching to C or C++ checks as appropriate."""
+    lang = lang_from_path(path)
+    if lang is None:
+        return []
+
     try:
         with open(path, 'r', encoding='utf-8', errors='replace', newline='') as f:
             content = f.read()
@@ -32,6 +44,15 @@ def check_file(path: str, cfg: Config) -> list[Violation]:
 
     lines = content.split('\n')
     content_bytes = content.encode()
+
+    if lang == Lang.CXX:
+        return _check_cxx_file(path, cfg, content, lines, content_bytes)
+    return _check_c_file(path, cfg, content, lines, content_bytes)
+
+
+def _check_c_file(path: str, cfg: Config, content: str, lines: list[str],
+                  content_bytes: bytes) -> list[Violation]:
+    """Run C-specific checks."""
     tree = parse(content_bytes)
     nodes = NodeCache(tree)
 
@@ -46,20 +67,52 @@ def check_file(path: str, cfg: Config) -> list[Violation]:
     )
 
 
+def _check_cxx_file(path: str, cfg: Config, content: str, lines: list[str],
+                    content_bytes: bytes) -> list[Violation]:
+    """Run C++ specific checks. Automatically enables CXX rules."""
+    cxx_cfg = cfg.with_cxx()
+
+    # file.ext: wrong C++ extension
+    ext_violations = []
+    if cxx_cfg.is_enabled("file.ext") and path.endswith(CXX_BAD_EXTS):
+        ext = Path(path).suffix
+        ext_map = {'.cpp': '.cc', '.hpp': '.hh'}
+        expected = ext_map.get(ext, '.cc')
+        ext_violations = [Violation(path, 1, "file.ext",
+                                    f"Use '{expected}' extension instead of '{ext}'")]
+
+    tree = parse_cpp(content_bytes)
+    nodes = NodeCache(tree)
+
+    return (
+        ext_violations +
+        check_file_format(path, content, lines, cxx_cfg) +
+        check_cxx_preprocessor(path, lines, content_bytes, nodes, cxx_cfg) +
+        check_cxx_globals(path, lines, content_bytes, nodes, cxx_cfg) +
+        check_cxx_naming(path, lines, content_bytes, nodes, cxx_cfg) +
+        check_cxx_declarations(path, lines, content_bytes, nodes, cxx_cfg) +
+        check_cxx_control(path, lines, content_bytes, nodes, cxx_cfg) +
+        check_cxx_writing(path, lines, content_bytes, nodes, cxx_cfg) +
+        check_clang_format(path, cxx_cfg)
+    )
+
+
 def find_files(paths: list[str]) -> list[str]:
-    """Find all .c and .h files."""
+    """Find all C and C++ source files."""
     files = []
     for p in paths:
-        if os.path.isfile(p) and p.endswith(('.c', '.h')):
+        if os.path.isfile(p) and p.endswith(ALL_EXTS):
             files.append(p)
         elif os.path.isdir(p):
             for root, _, names in os.walk(p):
-                files.extend(os.path.join(root, n) for n in names if n.endswith(('.c', '.h')))
+                files.extend(os.path.join(root, n) for n in names if n.endswith(ALL_EXTS))
     return sorted(files)
 
 
 CATEGORY_ORDER = ["File", "Style", "Functions", "Exports", "Preprocessor",
-                  "Declarations", "Control", "Strict", "Formatting", "Other"]
+                  "Declarations", "Control", "Strict", "Formatting",
+                  "CXX-File", "CXX-Preprocessor", "CXX-Global", "CXX-Naming",
+                  "CXX-Declarations", "CXX-Control", "CXX-Writing", "Other"]
 
 
 def _group_rules(cfg: Config) -> dict[str, list[tuple[str, str, bool]]]:
@@ -162,14 +215,14 @@ Exit codes:
 
     ap = argparse.ArgumentParser(
         prog='epita-coding-style',
-        description='Fast C linter for EPITA coding style compliance.',
+        description='Fast C/C++ linter for EPITA coding style compliance.',
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     # Positional
     ap.add_argument('paths', nargs='*', metavar='PATH',
-                    help='files or directories to check (recursively finds .c/.h)')
+                    help='files or directories to check (recursively finds .c/.h/.cc/.hh/.hxx)')
 
     # Config options
     cfg_group = ap.add_argument_group('Config')
@@ -240,7 +293,7 @@ Exit codes:
 
     files = find_files(args.paths)
     if not files:
-        print(f"{R}No C files found{RST}", file=sys.stderr)
+        print(f"{R}No C/C++ files found{RST}", file=sys.stderr)
         return 1
 
     total_major = total_minor = 0
