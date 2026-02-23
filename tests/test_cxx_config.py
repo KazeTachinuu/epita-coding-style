@@ -90,6 +90,14 @@ def test_with_cxx_preserves_user_limits():
     assert cxx.max_lines == 50
 
 
+def test_with_cxx_preserves_user_max_lines():
+    """Regression: user-specified max_lines must not be overridden to 50."""
+    cfg = Config()
+    cfg.max_lines = 25
+    cxx = cfg.with_cxx()
+    assert cxx.max_lines == 25
+
+
 # ── CXX defaults disabled ───────────────────────────────────────────────
 
 

@@ -166,3 +166,31 @@ def test_export_other_header_not_checked(check):
 def test_export_other_is_major(check_result):
     violations = [v for v in check_result("int a;\nint b;\n") if v.rule == "export.other"]
     assert violations and all(v.severity == Severity.MAJOR for v in violations)
+
+
+def test_export_other_max_globals_zero(tmp_path):
+    """Regression: max_globals=0 must not crash with IndexError."""
+    from epita_coding_style import check_file, Config
+    path = tmp_path / "test.c"
+    path.write_text("int a;\n")
+    cfg = Config()
+    cfg.max_globals = 0
+    violations = [v for v in check_file(str(path), cfg) if v.rule == "export.other"]
+    assert len(violations) == 1
+
+
+def _make_ptr_return_funcs(n):
+    """Generate n exported functions with pointer return types."""
+    return "\n".join(
+        f"int *pfunc{i}(void)\n{{\n    return 0;\n}}"
+        for i in range(n)
+    ) + "\n"
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (_make_ptr_return_funcs(10), False),
+    (_make_ptr_return_funcs(11), True),
+], ids=["10-ptr-return-ok", "11-ptr-return-fail"])
+def test_export_fun_pointer_return(check, code, should_fail):
+    """Regression: functions with pointer return types must be counted."""
+    assert check(code, "export.fun") == should_fail
