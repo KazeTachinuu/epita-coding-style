@@ -9,7 +9,7 @@ from textwrap import dedent
     ("int x = 1;\n", False),
     ("int x, y;\n", True),
     ("int *x, *y;\n", True),
-])
+], ids=["single-decl", "single-init", "multi-decl", "multi-ptr-decl"])
 def test_decl_single(check, code, should_fail):
     assert check(code, "decl.single") == should_fail
 
@@ -75,6 +75,9 @@ COND_ARRAY_ACCESS = dedent("""\
     ("void f(int n) { int arr[n]; }\n", True),
     ("void f(int n) { char buf[n]; }\n", True),
     ("void f(int n) { int mat[n]; }\n", True),
+], ids=[
+    "fixed-size", "macro-size", "return-access", "assign-access",
+    "funcall-access", "cond-access", "vla-int", "vla-char", "vla-mat",
 ])
 def test_decl_vla(check, code, should_fail):
     assert check(code, "decl.vla") == should_fail

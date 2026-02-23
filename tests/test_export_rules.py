@@ -47,7 +47,8 @@ def _make_multiline_funcs(n):
     (_make_multiline_funcs(11), True),
     (_make_mixed_funcs(10, 5), False),  # 10 exported + 5 static = OK
     (_make_mixed_funcs(11, 5), True),   # 11 exported + 5 static = fail
-])
+], ids=["10-ok", "11-fail", "15-static-ok", "10-multiline-ok",
+        "11-multiline-fail", "10+5-mixed-ok", "11+5-mixed-fail"])
 def test_export_fun(check, code, should_fail):
     assert check(code, "export.fun") == should_fail
 
@@ -127,7 +128,7 @@ STRING_BRACE_LOCAL = dedent("""\
 @pytest.mark.parametrize("code,should_fail", [
     ("int global_var;\n", False),
     ("int a;\nint b;\n", True),
-])
+], ids=["one-global-ok", "two-globals-fail"])
 def test_export_other(check, code, should_fail):
     assert check(code, "export.other") == should_fail
 
@@ -142,7 +143,8 @@ def test_export_other(check, code, should_fail):
     CONST_STATIC,
     CHAR_BRACE_LOCAL,
     STRING_BRACE_LOCAL,
-])
+], ids=["static", "extern", "local", "struct", "typedef",
+        "proto", "const-static", "char-brace", "string-brace"])
 def test_export_other_not_exported(check, code):
     assert not check(code, "export.other")
 
@@ -152,7 +154,7 @@ def test_export_other_not_exported(check, code):
     "int *a;\nint *b;\n",
     "int a[10];\nint b[20];\n",
     "char c = '{';\nint a;\nint b;\n",
-])
+], ids=["const-globals", "ptr-globals", "array-globals", "char-brace-globals"])
 def test_export_other_multiple_globals(check, code):
     assert check(code, "export.other")
 

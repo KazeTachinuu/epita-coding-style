@@ -1,57 +1,87 @@
 """Tests for CXX declaration rules."""
 
-
-class TestDeclRef:
-    """Tests for decl.ref rule (& next to type)."""
-
-    def test_ref_next_to_var(self, check_cxx):
-        code = "void foo(int &x) {}\n"
-        assert check_cxx(code, "decl.ref")
-
-    def test_ref_next_to_type_ok(self, check_cxx):
-        code = "void foo(int& x) {}\n"
-        assert not check_cxx(code, "decl.ref")
+import pytest
+from textwrap import dedent
 
 
-class TestDeclPoint:
-    """Tests for decl.point rule (* next to type)."""
+# ── decl.ref ─────────────────────────────────────────────────────────────
 
-    def test_ptr_next_to_var(self, check_cxx):
-        code = "void foo(int *x) {}\n"
-        assert check_cxx(code, "decl.point")
-
-    def test_ptr_next_to_type_ok(self, check_cxx):
-        code = "void foo(int* x) {}\n"
-        assert not check_cxx(code, "decl.point")
+REF_NEXT_TO_VAR = "void foo(int &x) {}\n"
+REF_NEXT_TO_TYPE = "void foo(int& x) {}\n"
 
 
-class TestCtorExplicit:
-    """Tests for decl.ctor.explicit rule."""
-
-    def test_single_arg_not_explicit(self, check_cxx):
-        code = "class Foo {\n    Foo(int x);\n};\n"
-        assert check_cxx(code, "decl.ctor.explicit")
-
-    def test_single_arg_explicit_ok(self, check_cxx):
-        code = "class Foo {\n    explicit Foo(int x);\n};\n"
-        assert not check_cxx(code, "decl.ctor.explicit")
-
-    def test_multi_arg_no_explicit_ok(self, check_cxx):
-        code = "class Foo {\n    Foo(int x, int y);\n};\n"
-        assert not check_cxx(code, "decl.ctor.explicit")
-
-    def test_zero_arg_no_explicit_ok(self, check_cxx):
-        code = "class Foo {\n    Foo();\n};\n"
-        assert not check_cxx(code, "decl.ctor.explicit")
+@pytest.mark.parametrize("code,should_fail", [
+    (REF_NEXT_TO_TYPE, False),
+    (REF_NEXT_TO_VAR, True),
+], ids=["ref-left-ok", "ref-right-bad"])
+def test_decl_ref(check_cxx, code, should_fail):
+    assert check_cxx(code, "decl.ref") == should_fail
 
 
-class TestDeclVla:
-    """Tests for decl.vla rule in C++."""
+# ── decl.point ───────────────────────────────────────────────────────────
 
-    def test_vla_detected(self, check_cxx):
-        code = "void foo(int n) { int arr[n]; }\n"
-        assert check_cxx(code, "decl.vla")
+PTR_NEXT_TO_VAR = "void foo(int *x) {}\n"
+PTR_NEXT_TO_TYPE = "void foo(int* x) {}\n"
 
-    def test_fixed_array_ok(self, check_cxx):
-        code = "void foo() { int arr[10]; }\n"
-        assert not check_cxx(code, "decl.vla")
+
+@pytest.mark.parametrize("code,should_fail", [
+    (PTR_NEXT_TO_TYPE, False),
+    (PTR_NEXT_TO_VAR, True),
+], ids=["ptr-left-ok", "ptr-right-bad"])
+def test_decl_point(check_cxx, code, should_fail):
+    assert check_cxx(code, "decl.point") == should_fail
+
+
+# ── decl.ctor.explicit ──────────────────────────────────────────────────
+
+CTOR_SINGLE_NOT_EXPLICIT = dedent("""\
+    class Foo
+    {
+        Foo(int x);
+    };
+""")
+
+CTOR_SINGLE_EXPLICIT = dedent("""\
+    class Foo
+    {
+        explicit Foo(int x);
+    };
+""")
+
+CTOR_MULTI_ARG = dedent("""\
+    class Foo
+    {
+        Foo(int x, int y);
+    };
+""")
+
+CTOR_ZERO_ARG = dedent("""\
+    class Foo
+    {
+        Foo();
+    };
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (CTOR_SINGLE_EXPLICIT, False),
+    (CTOR_MULTI_ARG, False),
+    (CTOR_ZERO_ARG, False),
+    (CTOR_SINGLE_NOT_EXPLICIT, True),
+], ids=["explicit-ok", "multi-arg-ok", "zero-arg-ok", "single-not-explicit"])
+def test_decl_ctor_explicit(check_cxx, code, should_fail):
+    assert check_cxx(code, "decl.ctor.explicit") == should_fail
+
+
+# ── decl.vla (C++) ──────────────────────────────────────────────────────
+
+VLA_DETECTED = "void foo(int n) { int arr[n]; }\n"
+FIXED_ARRAY = "void foo() { int arr[10]; }\n"
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (FIXED_ARRAY, False),
+    (VLA_DETECTED, True),
+], ids=["fixed-array-ok", "vla-detected"])
+def test_decl_vla(check_cxx, code, should_fail):
+    assert check_cxx(code, "decl.vla") == should_fail

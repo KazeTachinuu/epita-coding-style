@@ -8,7 +8,7 @@ from textwrap import dedent
     ("int x = 1;\n", False),
     ('asm("nop");\n', True),
     ('__asm__("nop");\n', True),
-])
+], ids=["no-asm", "asm", "__asm__"])
 def test_stat_asm(check, code, should_fail):
     assert check(code, "stat.asm") == should_fail
 
@@ -44,6 +44,6 @@ CTRL_FOR_FAIL = dedent("""\
     (CTRL_OK, False),
     (CTRL_WHILE_FAIL, True),
     (CTRL_FOR_FAIL, True),
-])
+], ids=["while-body-ok", "while-empty", "for-empty"])
 def test_ctrl_empty(check, code, should_fail):
     assert check(code, "ctrl.empty") == should_fail

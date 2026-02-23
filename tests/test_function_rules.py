@@ -44,7 +44,7 @@ PROTO_EMPTY = dedent("""\
     ("int f(int a, int b, int c, int d, int e) { return 0; }\n", True),
     (MULTILINE_4_ARGS, False),
     (MULTILINE_6_ARGS, True),
-])
+], ids=["void-ok", "4-args-ok", "5-args-fail", "multiline-4-ok", "multiline-6-fail"])
 def test_arg_count(check, code, should_fail):
     assert check(code, "fun.arg.count") == should_fail
 
@@ -77,7 +77,8 @@ def test_func_length_41_fail(check):
     "struct foo *",
     "const char *",
     "static char *",
-])
+], ids=["char*", "int*", "void*", "char**", "int***",
+        "struct-foo*", "const-char*", "static-char*"])
 def test_func_length_pointer_return_ok(check, return_type):
     """Functions with pointer return types under limit should pass."""
     body = "\n".join(["    x++;"] * 37)
@@ -94,7 +95,8 @@ def test_func_length_pointer_return_ok(check, return_type):
     "struct foo *",
     "const char *",
     "static char *",
-])
+], ids=["char*", "int*", "void*", "char**", "int***",
+        "struct-foo*", "const-char*", "static-char*"])
 def test_func_length_pointer_return_fail(check, return_type):
     """Functions with pointer return types over limit should fail."""
     body = "\n".join(["    x++;"] * 39)
@@ -106,7 +108,7 @@ def test_func_length_pointer_return_fail(check, return_type):
     "char *",
     "int **",
     "void *",
-])
+], ids=["char*", "int**", "void*"])
 def test_arg_count_pointer_return(check, return_type):
     """Arg count check works for functions with pointer return types."""
     # 4 args should pass
@@ -125,7 +127,7 @@ def test_arg_count_pointer_return(check, return_type):
     ("int (*f(void))(int)", True),
     # Parenthesized declarator - over limit
     ("int (f)(void)", True),
-])
+], ids=["ptr-to-array", "func-ptr", "paren-declarator"])
 def test_func_length_complex_return_types(check, signature, expect_fail):
     """Function length detection works for complex return types."""
     body = "\n".join(["    x++;"] * 39)
@@ -136,7 +138,7 @@ def test_func_length_complex_return_types(check, signature, expect_fail):
 @pytest.mark.parametrize("signature", [
     "int (*f(void))[10]",   # Returns pointer to array
     "int (*f(void))(int)",  # Returns function pointer
-])
+], ids=["ptr-to-array", "func-ptr"])
 def test_arg_count_complex_return_types(check, signature):
     """Arg count detection works for complex return types."""
     # Replace (void) with 5 args to trigger violation
@@ -148,6 +150,6 @@ def test_arg_count_complex_return_types(check, signature):
 @pytest.mark.parametrize("code,should_fail", [
     (PROTO_VOID_OK, False),
     (PROTO_EMPTY, True),
-])
+], ids=["void-ok", "empty-parens-fail"])
 def test_proto_void(check, code, should_fail):
     assert check(code, "fun.proto.void", suffix=".h") == should_fail

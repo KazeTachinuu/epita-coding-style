@@ -1,101 +1,101 @@
 """Tests for CXX global rules."""
 
-
-class TestGlobalCasts:
-    """Tests for global.casts rule (no C-style casts)."""
-
-    def test_c_style_cast_detected(self, check_cxx):
-        code = "void foo() { auto x = (int)3.14; }\n"
-        assert check_cxx(code, "global.casts")
-
-    def test_static_cast_ok(self, check_cxx):
-        code = "void foo() { auto x = static_cast<int>(3.14); }\n"
-        assert not check_cxx(code, "global.casts")
-
-    def test_reinterpret_cast_ok(self, check_cxx):
-        code = "void foo() { auto x = reinterpret_cast<char*>(ptr); }\n"
-        assert not check_cxx(code, "global.casts")
+import pytest
 
 
-class TestNoMalloc:
-    """Tests for global.memory.no_malloc rule."""
+# ── global.casts ─────────────────────────────────────────────────────────
 
-    def test_malloc_detected(self, check_cxx):
-        code = "void foo() { int* p = malloc(sizeof(int)); }\n"
-        assert check_cxx(code, "global.memory.no_malloc")
-
-    def test_calloc_detected(self, check_cxx):
-        code = "void foo() { int* p = calloc(10, sizeof(int)); }\n"
-        assert check_cxx(code, "global.memory.no_malloc")
-
-    def test_free_detected(self, check_cxx):
-        code = "void foo() { free(ptr); }\n"
-        assert check_cxx(code, "global.memory.no_malloc")
-
-    def test_new_ok(self, check_cxx):
-        code = "void foo() { int* p = new int(42); }\n"
-        assert not check_cxx(code, "global.memory.no_malloc")
+C_STYLE_CAST = "void foo() { auto x = (int)3.14; }\n"
+STATIC_CAST = "void foo() { auto x = static_cast<int>(3.14); }\n"
+REINTERPRET_CAST = "void foo() { auto x = reinterpret_cast<char*>(ptr); }\n"
 
 
-class TestNullptr:
-    """Tests for global.nullptr rule."""
-
-    def test_null_detected(self, check_cxx):
-        code = "void foo() { int* p = NULL; }\n"
-        assert check_cxx(code, "global.nullptr")
-
-    def test_nullptr_ok(self, check_cxx):
-        code = "void foo() { int* p = nullptr; }\n"
-        assert not check_cxx(code, "global.nullptr")
+@pytest.mark.parametrize("code,should_fail", [
+    (STATIC_CAST, False),
+    (REINTERPRET_CAST, False),
+    (C_STYLE_CAST, True),
+], ids=["static-cast-ok", "reinterpret-cast-ok", "c-style-cast-bad"])
+def test_global_casts(check_cxx, code, should_fail):
+    assert check_cxx(code, "global.casts") == should_fail
 
 
-class TestExternC:
-    """Tests for c.extern rule."""
+# ── global.memory.no_malloc ──────────────────────────────────────────────
 
-    def test_extern_c_detected(self, check_cxx):
-        code = 'extern "C" void cfunc();\n'
-        assert check_cxx(code, "c.extern")
-
-    def test_extern_c_block_detected(self, check_cxx):
-        code = 'extern "C" {\nvoid cfunc();\n}\n'
-        assert check_cxx(code, "c.extern")
-
-    def test_no_extern_c_ok(self, check_cxx):
-        code = "void foo() {}\n"
-        assert not check_cxx(code, "c.extern")
+MALLOC_CALL = "void foo() { int* p = malloc(sizeof(int)); }\n"
+CALLOC_CALL = "void foo() { int* p = calloc(10, sizeof(int)); }\n"
+FREE_CALL = "void foo() { free(ptr); }\n"
+NEW_CALL = "void foo() { int* p = new int(42); }\n"
 
 
-class TestCHeaders:
-    """Tests for c.headers rule."""
-
-    def test_c_header_detected(self, check_cxx):
-        code = "#include <stdio.h>\nint main() { return 0; }\n"
-        assert check_cxx(code, "c.headers")
-
-    def test_c_header_stdlib(self, check_cxx):
-        code = "#include <stdlib.h>\nint main() { return 0; }\n"
-        assert check_cxx(code, "c.headers")
-
-    def test_cxx_header_ok(self, check_cxx):
-        code = "#include <cstdio>\nint main() { return 0; }\n"
-        assert not check_cxx(code, "c.headers")
-
-    def test_cpp_header_ok(self, check_cxx):
-        code = "#include <iostream>\nint main() { return 0; }\n"
-        assert not check_cxx(code, "c.headers")
+@pytest.mark.parametrize("code,should_fail", [
+    (NEW_CALL, False),
+    (MALLOC_CALL, True),
+    (CALLOC_CALL, True),
+    (FREE_CALL, True),
+], ids=["new-ok", "malloc-bad", "calloc-bad", "free-bad"])
+def test_global_memory(check_cxx, code, should_fail):
+    assert check_cxx(code, "global.memory.no_malloc") == should_fail
 
 
-class TestCStdFunctions:
-    """Tests for c.std_functions rule."""
+# ── global.nullptr ───────────────────────────────────────────────────────
 
-    def test_printf_detected(self, check_cxx):
-        code = '#include <cstdio>\nvoid foo() { printf("hello"); }\n'
-        assert check_cxx(code, "c.std_functions")
+NULL_USED = "void foo() { int* p = NULL; }\n"
+NULLPTR_USED = "void foo() { int* p = nullptr; }\n"
 
-    def test_strlen_detected(self, check_cxx):
-        code = '#include <cstring>\nvoid foo() { strlen("hello"); }\n'
-        assert check_cxx(code, "c.std_functions")
 
-    def test_std_cout_ok(self, check_cxx):
-        code = '#include <iostream>\nvoid foo() { std::cout << "hello"; }\n'
-        assert not check_cxx(code, "c.std_functions")
+@pytest.mark.parametrize("code,should_fail", [
+    (NULLPTR_USED, False),
+    (NULL_USED, True),
+], ids=["nullptr-ok", "null-bad"])
+def test_global_nullptr(check_cxx, code, should_fail):
+    assert check_cxx(code, "global.nullptr") == should_fail
+
+
+# ── c.extern ─────────────────────────────────────────────────────────────
+
+EXTERN_C_SINGLE = 'extern "C" void cfunc();\n'
+EXTERN_C_BLOCK = 'extern "C" {\nvoid cfunc();\n}\n'
+NO_EXTERN_C = "void foo() {}\n"
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (NO_EXTERN_C, False),
+    (EXTERN_C_SINGLE, True),
+    (EXTERN_C_BLOCK, True),
+], ids=["no-extern-ok", "extern-c-single", "extern-c-block"])
+def test_c_extern(check_cxx, code, should_fail):
+    assert check_cxx(code, "c.extern") == should_fail
+
+
+# ── c.headers ────────────────────────────────────────────────────────────
+
+INCLUDE_STDIO_H = "#include <stdio.h>\nint main() { return 0; }\n"
+INCLUDE_STDLIB_H = "#include <stdlib.h>\nint main() { return 0; }\n"
+INCLUDE_CSTDIO = "#include <cstdio>\nint main() { return 0; }\n"
+INCLUDE_IOSTREAM = "#include <iostream>\nint main() { return 0; }\n"
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (INCLUDE_CSTDIO, False),
+    (INCLUDE_IOSTREAM, False),
+    (INCLUDE_STDIO_H, True),
+    (INCLUDE_STDLIB_H, True),
+], ids=["cstdio-ok", "iostream-ok", "stdio.h-bad", "stdlib.h-bad"])
+def test_c_headers(check_cxx, code, should_fail):
+    assert check_cxx(code, "c.headers") == should_fail
+
+
+# ── c.std_functions ──────────────────────────────────────────────────────
+
+BARE_PRINTF = '#include <cstdio>\nvoid foo() { printf("hello"); }\n'
+BARE_STRLEN = '#include <cstring>\nvoid foo() { strlen("hello"); }\n'
+STD_COUT = '#include <iostream>\nvoid foo() { std::cout << "hello"; }\n'
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (STD_COUT, False),
+    (BARE_PRINTF, True),
+    (BARE_STRLEN, True),
+], ids=["std-cout-ok", "printf-bad", "strlen-bad"])
+def test_c_std_functions(check_cxx, code, should_fail):
+    assert check_cxx(code, "c.std_functions") == should_fail

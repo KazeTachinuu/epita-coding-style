@@ -103,7 +103,7 @@ CHAR_WITH_VIOLATION = dedent("""\
     (KR_FUNC, True),
     (KR_IF, True),
     (ELSE_SAME_LINE, True),
-])
+], ids=["allman-ok", "kr-func", "kr-if", "else-same-line"])
 def test_braces(check, code, should_fail):
     # Use noformat preset to test braces independently from clang-format
     assert check(code, "braces", preset="noformat") == should_fail
@@ -113,12 +113,13 @@ def test_braces(check, code, should_fail):
     "int arr[] = {1, 2, 3};\n",
     DO_WHILE,
     MACRO,
-])
+], ids=["array-init", "do-while", "macro"])
 def test_braces_exceptions(check, code):
     assert not check(code, "braces", preset="noformat")
 
 
-@pytest.mark.parametrize("code", [CHAR_OPEN, CHAR_CLOSE, CHAR_BOTH])
+@pytest.mark.parametrize("code", [CHAR_OPEN, CHAR_CLOSE, CHAR_BOTH],
+                         ids=["char-open", "char-close", "char-both"])
 def test_braces_char_literals_no_false_positive(check, code):
     assert not check(code, "braces", preset="noformat")
 

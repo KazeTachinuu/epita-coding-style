@@ -1,165 +1,283 @@
 """Tests for CXX writing rules."""
 
-
-class TestBracesEmpty:
-    """Tests for braces.empty rule ({} on same line for empty bodies)."""
-
-    def test_empty_body_multiline(self, check_cxx):
-        code = "void foo()\n{\n}\n"
-        assert check_cxx(code, "braces.empty")
-
-    def test_empty_body_same_line_ok(self, check_cxx):
-        code = "void foo() {}\n"
-        assert not check_cxx(code, "braces.empty")
+import pytest
+from textwrap import dedent
 
 
-class TestBracesSingleExp:
-    """Tests for braces.single_exp rule."""
+# ── braces.empty ─────────────────────────────────────────────────────────
 
-    def test_if_without_braces(self, check_cxx):
-        code = "void foo() {\n    if (true)\n        return;\n}\n"
-        assert check_cxx(code, "braces.single_exp")
-
-    def test_if_with_braces_ok(self, check_cxx):
-        code = "void foo() {\n    if (true) {\n        return;\n    }\n}\n"
-        assert not check_cxx(code, "braces.single_exp")
+EMPTY_BODY_MULTILINE = "void foo()\n{\n}\n"
+EMPTY_BODY_SAME_LINE = "void foo() {}\n"
 
 
-class TestErrThrow:
-    """Tests for err.throw rule (don't throw literals)."""
-
-    def test_throw_integer(self, check_cxx):
-        code = "void foo() { throw 42; }\n"
-        assert check_cxx(code, "err.throw")
-
-    def test_throw_string(self, check_cxx):
-        code = 'void foo() { throw "error"; }\n'
-        assert check_cxx(code, "err.throw")
-
-    def test_throw_exception_ok(self, check_cxx):
-        code = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("err"); }\n'
-        assert not check_cxx(code, "err.throw")
+@pytest.mark.parametrize("code,should_fail", [
+    (EMPTY_BODY_SAME_LINE, False),
+    (EMPTY_BODY_MULTILINE, True),
+], ids=["same-line-ok", "multiline-bad"])
+def test_braces_empty(check_cxx, code, should_fail):
+    assert check_cxx(code, "braces.empty") == should_fail
 
 
-class TestErrThrowCatch:
-    """Tests for err.throw.catch rule (catch by reference)."""
+# ── braces.single_exp ───────────────────────────────────────────────────
 
-    def test_catch_by_value(self, check_cxx):
-        code = "void foo() {\n    try { throw 1; }\n    catch (int x) {}\n}\n"
-        assert check_cxx(code, "err.throw.catch")
+IF_WITHOUT_BRACES = dedent("""\
+    void foo()
+    {
+        if (true)
+            return;
+    }
+""")
 
-    def test_catch_by_reference_ok(self, check_cxx):
-        code = "void foo() {\n    try { throw 1; }\n    catch (const int& x) {}\n}\n"
-        assert not check_cxx(code, "err.throw.catch")
-
-    def test_catch_ellipsis_ok(self, check_cxx):
-        code = "void foo() {\n    try { throw 1; }\n    catch (...) {}\n}\n"
-        assert not check_cxx(code, "err.throw.catch")
-
-
-class TestErrThrowParen:
-    """Tests for err.throw.paren rule."""
-
-    def test_throw_with_parens(self, check_cxx):
-        code = '#include <stdexcept>\nvoid foo() { throw(std::runtime_error("err")); }\n'
-        assert check_cxx(code, "err.throw.paren")
-
-    def test_throw_without_parens_ok(self, check_cxx):
-        code = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("err"); }\n'
-        assert not check_cxx(code, "err.throw.paren")
+IF_WITH_BRACES = dedent("""\
+    void foo()
+    {
+        if (true)
+        {
+            return;
+        }
+    }
+""")
 
 
-class TestExpPadding:
-    """Tests for exp.padding rule (no space in operator keyword)."""
-
-    def test_operator_with_space(self, check_cxx):
-        code = "class Foo {\n    bool operator ==(const Foo& o);\n};\n"
-        assert check_cxx(code, "exp.padding")
-
-    def test_operator_no_space_ok(self, check_cxx):
-        code = "class Foo {\n    bool operator==(const Foo& o);\n};\n"
-        assert not check_cxx(code, "exp.padding")
+@pytest.mark.parametrize("code,should_fail", [
+    (IF_WITH_BRACES, False),
+    (IF_WITHOUT_BRACES, True),
+], ids=["with-braces-ok", "without-braces-bad"])
+def test_braces_single_exp(check_cxx, code, should_fail):
+    assert check_cxx(code, "braces.single_exp") == should_fail
 
 
-class TestFunProtoVoidCxx:
-    """Tests for fun.proto.void.cxx rule (no void in empty params)."""
+# ── err.throw ────────────────────────────────────────────────────────────
 
-    def test_void_params_in_cxx(self, check_cxx):
-        code = "void foo(void) {}\n"
-        assert check_cxx(code, "fun.proto.void.cxx")
-
-    def test_empty_params_ok(self, check_cxx):
-        code = "void foo() {}\n"
-        assert not check_cxx(code, "fun.proto.void.cxx")
-
-    def test_void_in_declaration(self, check_cxx):
-        code = "void foo(void);\n"
-        assert check_cxx(code, "fun.proto.void.cxx")
+THROW_INTEGER = "void foo() { throw 42; }\n"
+THROW_STRING = 'void foo() { throw "error"; }\n'
+THROW_EXCEPTION = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("err"); }\n'
 
 
-class TestOpAssign:
-    """Tests for op.assign rule."""
-
-    def test_assign_no_ref_return(self, check_cxx):
-        code = "class Foo {\n    Foo operator=(const Foo& o) { return *this; }\n};\n"
-        assert check_cxx(code, "op.assign")
-
-    def test_assign_correct_ok(self, check_cxx):
-        code = "class Foo {\n    Foo& operator=(const Foo& o) { return *this; }\n};\n"
-        assert not check_cxx(code, "op.assign")
-
-    def test_assign_missing_this(self, check_cxx):
-        code = "class Foo {\n    Foo& operator=(const Foo& o) { return o; }\n};\n"
-        assert check_cxx(code, "op.assign")
+@pytest.mark.parametrize("code,should_fail", [
+    (THROW_EXCEPTION, False),
+    (THROW_INTEGER, True),
+    (THROW_STRING, True),
+], ids=["exception-ok", "integer-bad", "string-bad"])
+def test_err_throw(check_cxx, code, should_fail):
+    assert check_cxx(code, "err.throw") == should_fail
 
 
-class TestOpOverload:
-    """Tests for op.overload rule (forbidden overloads)."""
+# ── err.throw.catch ──────────────────────────────────────────────────────
 
-    def test_overload_comma(self, check_cxx):
-        code = "class Foo {\n    Foo operator,(const Foo& o);\n};\n"
-        assert check_cxx(code, "op.overload")
+CATCH_BY_VALUE = dedent("""\
+    void foo()
+    {
+        try { throw 1; }
+        catch (int x) {}
+    }
+""")
 
-    def test_overload_logical_or(self, check_cxx):
-        code = "class Foo {\n    bool operator||(const Foo& o);\n};\n"
-        assert check_cxx(code, "op.overload")
+CATCH_BY_REF = dedent("""\
+    void foo()
+    {
+        try { throw 1; }
+        catch (const int& x) {}
+    }
+""")
 
-    def test_overload_logical_and(self, check_cxx):
-        code = "class Foo {\n    bool operator&&(const Foo& o);\n};\n"
-        assert check_cxx(code, "op.overload")
-
-    def test_overload_plus_ok(self, check_cxx):
-        code = "class Foo {\n    Foo operator+(const Foo& o);\n};\n"
-        assert not check_cxx(code, "op.overload")
-
-
-class TestOpOverloadBinand:
-    """Tests for op.overload.binand rule."""
-
-    def test_overload_address_of(self, check_cxx):
-        code = "class Foo {\n    Foo* operator&();\n};\n"
-        assert check_cxx(code, "op.overload.binand")
-
-
-class TestEnumClass:
-    """Tests for enum.class rule."""
-
-    def test_plain_enum(self, check_cxx):
-        code = "enum Color { Red, Green, Blue };\n"
-        assert check_cxx(code, "enum.class")
-
-    def test_enum_class_ok(self, check_cxx):
-        code = "enum class Color { Red, Green, Blue };\n"
-        assert not check_cxx(code, "enum.class")
+CATCH_ELLIPSIS = dedent("""\
+    void foo()
+    {
+        try { throw 1; }
+        catch (...) {}
+    }
+""")
 
 
-class TestExpLinebreak:
-    """Tests for exp.linebreak rule."""
+@pytest.mark.parametrize("code,should_fail", [
+    (CATCH_BY_REF, False),
+    (CATCH_ELLIPSIS, False),
+    (CATCH_BY_VALUE, True),
+], ids=["by-ref-ok", "ellipsis-ok", "by-value-bad"])
+def test_err_throw_catch(check_cxx, code, should_fail):
+    assert check_cxx(code, "err.throw.catch") == should_fail
 
-    def test_operator_at_end_of_line(self, check_cxx):
-        code = "void foo() {\n    int x = 1 +\n        2;\n}\n"
-        assert check_cxx(code, "exp.linebreak")
 
-    def test_operator_at_start_of_next_line_ok(self, check_cxx):
-        code = "void foo() {\n    int x = 1\n        + 2;\n}\n"
-        assert not check_cxx(code, "exp.linebreak")
+# ── err.throw.paren ─────────────────────────────────────────────────────
+
+THROW_WITH_PARENS = '#include <stdexcept>\nvoid foo() { throw(std::runtime_error("err")); }\n'
+THROW_WITHOUT_PARENS = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("err"); }\n'
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (THROW_WITHOUT_PARENS, False),
+    (THROW_WITH_PARENS, True),
+], ids=["no-parens-ok", "parens-bad"])
+def test_err_throw_paren(check_cxx, code, should_fail):
+    assert check_cxx(code, "err.throw.paren") == should_fail
+
+
+# ── exp.padding ──────────────────────────────────────────────────────────
+
+OPERATOR_WITH_SPACE = dedent("""\
+    class Foo
+    {
+        bool operator ==(const Foo& o);
+    };
+""")
+
+OPERATOR_NO_SPACE = dedent("""\
+    class Foo
+    {
+        bool operator==(const Foo& o);
+    };
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (OPERATOR_NO_SPACE, False),
+    (OPERATOR_WITH_SPACE, True),
+], ids=["no-space-ok", "space-bad"])
+def test_exp_padding(check_cxx, code, should_fail):
+    assert check_cxx(code, "exp.padding") == should_fail
+
+
+# ── fun.proto.void.cxx ──────────────────────────────────────────────────
+
+VOID_PARAMS = "void foo(void) {}\n"
+EMPTY_PARAMS = "void foo() {}\n"
+VOID_IN_DECL = "void foo(void);\n"
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (EMPTY_PARAMS, False),
+    (VOID_PARAMS, True),
+    (VOID_IN_DECL, True),
+], ids=["empty-params-ok", "void-params-bad", "void-in-decl-bad"])
+def test_fun_proto_void_cxx(check_cxx, code, should_fail):
+    assert check_cxx(code, "fun.proto.void.cxx") == should_fail
+
+
+# ── op.assign ────────────────────────────────────────────────────────────
+
+ASSIGN_NO_REF_RETURN = dedent("""\
+    class Foo
+    {
+        Foo operator=(const Foo& o) { return *this; }
+    };
+""")
+
+ASSIGN_CORRECT = dedent("""\
+    class Foo
+    {
+        Foo& operator=(const Foo& o) { return *this; }
+    };
+""")
+
+ASSIGN_MISSING_THIS = dedent("""\
+    class Foo
+    {
+        Foo& operator=(const Foo& o) { return o; }
+    };
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (ASSIGN_CORRECT, False),
+    (ASSIGN_NO_REF_RETURN, True),
+    (ASSIGN_MISSING_THIS, True),
+], ids=["correct-ok", "no-ref-return-bad", "missing-this-bad"])
+def test_op_assign(check_cxx, code, should_fail):
+    assert check_cxx(code, "op.assign") == should_fail
+
+
+# ── op.overload ──────────────────────────────────────────────────────────
+
+OVERLOAD_COMMA = dedent("""\
+    class Foo
+    {
+        Foo operator,(const Foo& o);
+    };
+""")
+
+OVERLOAD_LOGICAL_OR = dedent("""\
+    class Foo
+    {
+        bool operator||(const Foo& o);
+    };
+""")
+
+OVERLOAD_LOGICAL_AND = dedent("""\
+    class Foo
+    {
+        bool operator&&(const Foo& o);
+    };
+""")
+
+OVERLOAD_PLUS = dedent("""\
+    class Foo
+    {
+        Foo operator+(const Foo& o);
+    };
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (OVERLOAD_PLUS, False),
+    (OVERLOAD_COMMA, True),
+    (OVERLOAD_LOGICAL_OR, True),
+    (OVERLOAD_LOGICAL_AND, True),
+], ids=["plus-ok", "comma-bad", "logical-or-bad", "logical-and-bad"])
+def test_op_overload(check_cxx, code, should_fail):
+    assert check_cxx(code, "op.overload") == should_fail
+
+
+# ── op.overload.binand ──────────────────────────────────────────────────
+
+OVERLOAD_ADDRESS_OF = dedent("""\
+    class Foo
+    {
+        Foo* operator&();
+    };
+""")
+
+
+def test_op_overload_binand(check_cxx):
+    assert check_cxx(OVERLOAD_ADDRESS_OF, "op.overload.binand")
+
+
+# ── enum.class ───────────────────────────────────────────────────────────
+
+PLAIN_ENUM = "enum Color { Red, Green, Blue };\n"
+ENUM_CLASS = "enum class Color { Red, Green, Blue };\n"
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (ENUM_CLASS, False),
+    (PLAIN_ENUM, True),
+], ids=["enum-class-ok", "plain-enum-bad"])
+def test_enum_class(check_cxx, code, should_fail):
+    assert check_cxx(code, "enum.class") == should_fail
+
+
+# ── exp.linebreak ───────────────────────────────────────────────────────
+
+OPERATOR_END_OF_LINE = dedent("""\
+    void foo()
+    {
+        int x = 1 +
+            2;
+    }
+""")
+
+OPERATOR_START_OF_NEXT = dedent("""\
+    void foo()
+    {
+        int x = 1
+            + 2;
+    }
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (OPERATOR_START_OF_NEXT, False),
+    (OPERATOR_END_OF_LINE, True),
+], ids=["start-of-next-ok", "end-of-line-bad"])
+def test_exp_linebreak(check_cxx, code, should_fail):
+    assert check_cxx(code, "exp.linebreak") == should_fail

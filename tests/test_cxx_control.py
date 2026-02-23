@@ -1,33 +1,85 @@
 """Tests for CXX control flow rules."""
 
-
-class TestCtrlSwitch:
-    """Tests for ctrl.switch rule (default case required)."""
-
-    def test_switch_without_default(self, check_cxx):
-        code = "void foo(int x) { switch (x) { case 1: break; } }\n"
-        assert check_cxx(code, "ctrl.switch")
-
-    def test_switch_with_default_ok(self, check_cxx):
-        code = "void foo(int x) { switch (x) { case 1: break; default: break; } }\n"
-        assert not check_cxx(code, "ctrl.switch")
+import pytest
+from textwrap import dedent
 
 
-class TestCtrlSwitchPadding:
-    """Tests for ctrl.switch.padding rule (no space before colon)."""
+# ── ctrl.switch ──────────────────────────────────────────────────────────
 
-    def test_space_before_colon(self, check_cxx):
-        code = "void foo(int x) {\n    switch (x) {\n    case 1 :\n        break;\n    default:\n        break;\n    }\n}\n"
-        assert check_cxx(code, "ctrl.switch.padding")
+SWITCH_NO_DEFAULT = "void foo(int x) { switch (x) { case 1: break; } }\n"
 
-    def test_no_space_before_colon_ok(self, check_cxx):
-        code = "void foo(int x) {\n    switch (x) {\n    case 1:\n        break;\n    default:\n        break;\n    }\n}\n"
-        assert not check_cxx(code, "ctrl.switch.padding")
+SWITCH_WITH_DEFAULT = "void foo(int x) { switch (x) { case 1: break; default: break; } }\n"
 
 
-class TestCtrlEmpty:
-    """Tests for ctrl.empty rule (empty loop bodies)."""
+@pytest.mark.parametrize("code,should_fail", [
+    (SWITCH_WITH_DEFAULT, False),
+    (SWITCH_NO_DEFAULT, True),
+], ids=["with-default", "without-default"])
+def test_ctrl_switch(check_cxx, code, should_fail):
+    assert check_cxx(code, "ctrl.switch") == should_fail
 
-    def test_empty_while_body(self, check_cxx):
-        code = "void foo() {\n    while (true)\n        ;\n}\n"
-        assert check_cxx(code, "ctrl.empty")
+
+# ── ctrl.switch.padding ─────────────────────────────────────────────────
+
+SWITCH_SPACE_BEFORE_COLON = dedent("""\
+    void foo(int x)
+    {
+        switch (x)
+        {
+        case 1 :
+            break;
+        default:
+            break;
+        }
+    }
+""")
+
+SWITCH_NO_SPACE_BEFORE_COLON = dedent("""\
+    void foo(int x)
+    {
+        switch (x)
+        {
+        case 1:
+            break;
+        default:
+            break;
+        }
+    }
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (SWITCH_NO_SPACE_BEFORE_COLON, False),
+    (SWITCH_SPACE_BEFORE_COLON, True),
+], ids=["no-space", "space-before-colon"])
+def test_ctrl_switch_padding(check_cxx, code, should_fail):
+    assert check_cxx(code, "ctrl.switch.padding") == should_fail
+
+
+# ── ctrl.empty ───────────────────────────────────────────────────────────
+
+EMPTY_WHILE_BODY = dedent("""\
+    void foo()
+    {
+        while (true)
+            ;
+    }
+""")
+
+WHILE_WITH_CONTINUE = dedent("""\
+    void foo()
+    {
+        while (true)
+        {
+            continue;
+        }
+    }
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (WHILE_WITH_CONTINUE, False),
+    (EMPTY_WHILE_BODY, True),
+], ids=["continue-ok", "empty-while"])
+def test_ctrl_empty(check_cxx, code, should_fail):
+    assert check_cxx(code, "ctrl.empty") == should_fail
