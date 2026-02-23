@@ -50,7 +50,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/epita_coding_style"]
-include = ["src/epita_coding_style/.clang-format"]
+include = ["src/epita_coding_style/.clang-format*"]
 
 [tool.hatch.build.targets.sdist]
 include = [
