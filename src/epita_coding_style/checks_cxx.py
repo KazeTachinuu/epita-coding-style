@@ -510,7 +510,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
 
     # exp.linebreak: line breaks before binary operators
     if cfg.is_enabled("exp.linebreak"):
-        v.extend(_check_linebreak_operators(path, lines))
+        v.extend(_check_linebreak_operators(path, lines, root=nodes.root))
 
     # fun.proto.void.cxx: MUST NOT use void in C++ empty params
     if cfg.is_enabled("fun.proto.void.cxx"):
@@ -614,12 +614,66 @@ def _check_operator_padding(path: str, lines: list[str]) -> list[Violation]:
     return v
 
 
-def _check_linebreak_operators(path: str, lines: list[str]) -> list[Violation]:
+def _collect_non_binary_op_lines(root) -> set[tuple[int, str]]:
+    """Use tree-sitter AST to find lines where >, >>, &, or * are NOT binary operators.
+
+    Returns a set of (0-based line number, operator string) pairs that should be
+    excluded from the binary operator line-break check.
+    """
+    excluded = set()
+
+    def _walk(node):
+        # Template parameter lists: template<...> — the > is not a binary op
+        if node.type == 'template_parameter_list':
+            end_line = node.end_point[0]
+            excluded.add((end_line, '>'))
+            excluded.add((end_line, '>>'))
+
+        # Template argument lists: vector<int> — the > is not a binary op
+        elif node.type == 'template_argument_list':
+            end_line = node.end_point[0]
+            excluded.add((end_line, '>'))
+            excluded.add((end_line, '>>'))
+
+        # Reference declarators: const int& x, auto f() -> const T&
+        elif node.type in ('reference_declarator', 'abstract_reference_declarator',
+                           'type_descriptor'):
+            for child in node.children:
+                if child.type == '&' or child.type == '&&':
+                    excluded.add((child.start_point[0], child.type))
+
+        # Pointer declarators: int* p
+        elif node.type in ('pointer_declarator', 'abstract_pointer_declarator'):
+            for child in node.children:
+                if child.type == '*':
+                    excluded.add((child.start_point[0], '*'))
+
+        # Trailing return type: auto f() -> const T&
+        elif node.type == 'trailing_return_type':
+            end_line = node.end_point[0]
+            # The & or * at end of a trailing return type is a type qualifier
+            excluded.add((end_line, '&'))
+            excluded.add((end_line, '*'))
+            excluded.add((end_line, '>'))
+            excluded.add((end_line, '>>'))
+
+        for child in node.children:
+            _walk(child)
+
+    _walk(root)
+    return excluded
+
+
+def _check_linebreak_operators(path: str, lines: list[str],
+                               root=None) -> list[Violation]:
     """Check that line breaks come before binary operators, not after."""
     v = []
     # Binary operators that should not start a continuation line
     bin_ops = {'&&', '||', '+', '-', '*', '/', '%', '&', '|', '^', '<<', '>>',
                '==', '!=', '<', '>', '<=', '>='}
+
+    # Use tree-sitter to find lines where ambiguous operators are NOT binary
+    excluded = _collect_non_binary_op_lines(root) if root else set()
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
@@ -631,6 +685,9 @@ def _check_linebreak_operators(path: str, lines: list[str]) -> list[Violation]:
                 # Verify it's not a unary or part of something else
                 before = s[:-len(op)].rstrip()
                 if before and not before.endswith(('(', ',', '=')):
+                    # Skip if tree-sitter says this is not a binary operator
+                    if (i - 1, op) in excluded:
+                        break
                     v.append(Violation(path, i, "exp.linebreak",
                                        f"Line break should come before '{op}', not after",
                                        line_content=line))

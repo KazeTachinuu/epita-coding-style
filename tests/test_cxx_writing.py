@@ -275,9 +275,73 @@ OPERATOR_START_OF_NEXT = dedent("""\
 """)
 
 
+TEMPLATE_CLOSING_ANGLE = dedent("""\
+    template <typename Lhs, typename Rhs>
+    class Bimap
+    {};
+""")
+
+TEMPLATE_FUNCTION = dedent("""\
+    template <typename Lhs, typename Rhs>
+    auto foo(const Lhs& a, const Rhs& b) -> bool
+    {
+        return true;
+    }
+""")
+
+REFERENCE_RETURN_TYPE = dedent("""\
+    template <typename T>
+    auto get() const -> const std::map<int, T>&
+    {
+        return m_;
+    }
+""")
+
+REFERENCE_PARAM = dedent("""\
+    void foo(const std::string& s)
+    {}
+""")
+
+NESTED_TEMPLATE = dedent("""\
+    std::map<int, std::map<int, int>> m;
+""")
+
+POINTER_RETURN_TYPE = dedent("""\
+    int* get()
+    {
+        return nullptr;
+    }
+""")
+
+REAL_BINARY_OP_AT_EOL = dedent("""\
+    void foo()
+    {
+        bool x = a &&
+            b;
+    }
+""")
+
+
 @pytest.mark.parametrize("code,should_fail", [
     (OPERATOR_START_OF_NEXT, False),
     (OPERATOR_END_OF_LINE, True),
-], ids=["start-of-next-ok", "end-of-line-bad"])
+    (TEMPLATE_CLOSING_ANGLE, False),
+    (TEMPLATE_FUNCTION, False),
+    (REFERENCE_RETURN_TYPE, False),
+    (REFERENCE_PARAM, False),
+    (NESTED_TEMPLATE, False),
+    (POINTER_RETURN_TYPE, False),
+    (REAL_BINARY_OP_AT_EOL, True),
+], ids=[
+    "start-of-next-ok",
+    "end-of-line-bad",
+    "template-closing-angle-ok",
+    "template-function-ok",
+    "reference-return-type-ok",
+    "reference-param-ok",
+    "nested-template-ok",
+    "pointer-return-type-ok",
+    "real-binary-op-at-eol-bad",
+])
 def test_exp_linebreak(check_cxx, code, should_fail):
     assert check_cxx(code, "exp.linebreak") == should_fail
