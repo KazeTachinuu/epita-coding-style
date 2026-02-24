@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+import urllib.request
 from pathlib import Path
 
 from . import __version__
@@ -194,6 +196,32 @@ def _print_config(cfg: Config, use_color: bool = True):
             print(f'{color}{code:<{col}}{RST}{DIM}# {desc}{RST}')
 
 
+def _parse_version(v: str) -> tuple[int, ...]:
+    """Parse a version string like '3.1.1' into a tuple of ints for comparison."""
+    try:
+        return tuple(int(x) for x in v.strip().split('.'))
+    except (ValueError, AttributeError):
+        return (0,)
+
+
+def _check_for_update() -> str | None:
+    """Check PyPI for a newer version. Returns a message string or None."""
+    try:
+        url = "https://pypi.org/pypi/epita-coding-style/json"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            data = json.loads(resp.read())
+        latest = data["info"]["version"]
+        if _parse_version(latest) > _parse_version(__version__):
+            return (
+                f"A new version is available: {__version__} -> {latest}\n"
+                f"Update with: pipx upgrade epita-coding-style"
+            )
+    except Exception:
+        pass
+    return None
+
+
 def main():
     # Build epilog with config file and preset info
     epilog = """\
@@ -332,6 +360,12 @@ Exit codes:
     # Show clang-format command if there are files to format
     if files_needing_format:
         print(f"\n{Y}Fix formatting:{RST} clang-format -i {' '.join(files_needing_format)}")
+
+    # Check for newer version (only in interactive TTY sessions)
+    if sys.stderr.isatty():
+        update_msg = _check_for_update()
+        if update_msg:
+            print(f"\n{C}{update_msg}{RST}", file=sys.stderr)
 
     return 1 if total_major > 0 else 0
 
