@@ -54,6 +54,14 @@ def test_cpp_include_order(check_cxx, code, should_fail):
     assert check_cxx(code, "cpp.include.order") == should_fail
 
 
+# .hh file including same-name .hxx at the end is the standard template pattern
+HEADER_WITH_HXX_AT_END = '#pragma once\n#include <map>\nclass Foo {};\n#include "test.hxx"\n'
+
+
+def test_cpp_include_order_hh_hxx_at_end(check_cxx):
+    assert check_cxx(HEADER_WITH_HXX_AT_END, "cpp.include.order", suffix=".hh") == False
+
+
 # ── cpp.constexpr ───────────────────────────────────────────────────────
 
 CONST_LITERAL = "const int x = 42;\nint main() { return 0; }\n"

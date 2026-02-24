@@ -129,11 +129,27 @@ OPERATOR_NO_SPACE = dedent("""\
     };
 """)
 
+OPERATOR_CAST_BOOL = dedent("""\
+    class Foo
+    {
+        operator bool() const;
+    };
+""")
+
+OPERATOR_CAST_INT = dedent("""\
+    class Foo
+    {
+        operator int() const;
+    };
+""")
+
 
 @pytest.mark.parametrize("code,should_fail", [
     (OPERATOR_NO_SPACE, False),
     (OPERATOR_WITH_SPACE, True),
-], ids=["no-space-ok", "space-bad"])
+    (OPERATOR_CAST_BOOL, False),
+    (OPERATOR_CAST_INT, False),
+], ids=["no-space-ok", "space-bad", "cast-bool-ok", "cast-int-ok"])
 def test_exp_padding(check_cxx, code, should_fail):
     assert check_cxx(code, "exp.padding") == should_fail
 
@@ -177,12 +193,29 @@ ASSIGN_MISSING_THIS = dedent("""\
     };
 """)
 
+ASSIGN_EQUALITY_NOT_ASSIGN = dedent("""\
+    class Foo
+    {
+        bool operator==(const Foo& o) const { return true; }
+    };
+""")
+
+ASSIGN_COMPOUND_NOT_ASSIGN = dedent("""\
+    class Foo
+    {
+        Foo& operator+=(const Foo& o) { return *this; }
+    };
+""")
+
 
 @pytest.mark.parametrize("code,should_fail", [
     (ASSIGN_CORRECT, False),
     (ASSIGN_NO_REF_RETURN, True),
     (ASSIGN_MISSING_THIS, True),
-], ids=["correct-ok", "no-ref-return-bad", "missing-this-bad"])
+    (ASSIGN_EQUALITY_NOT_ASSIGN, False),
+    (ASSIGN_COMPOUND_NOT_ASSIGN, False),
+], ids=["correct-ok", "no-ref-return-bad", "missing-this-bad",
+        "equality-not-assign-ok", "compound-not-assign-ok"])
 def test_op_assign(check_cxx, code, should_fail):
     assert check_cxx(code, "op.assign") == should_fail
 

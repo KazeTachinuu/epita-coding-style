@@ -119,11 +119,12 @@ def _check_include_order(path: str, lines: list[str], nodes: NodeCache,
     if not includes:
         return v
 
-    # Check self-include is first
+    # Check self-include is first (skip for .hh including .hxx at the end)
     self_incs = [i for i in includes if i[1] == 'self']
     if self_incs:
+        is_header_with_hxx = path.endswith('.hh') and self_incs[0][2].endswith('.hxx')
         first_non_self = next((i for i in includes if i[1] != 'self'), None)
-        if first_non_self and self_incs[0][0] > first_non_self[0]:
+        if not is_header_with_hxx and first_non_self and self_incs[0][0] > first_non_self[0]:
             v.append(Violation(path, self_incs[0][0], "cpp.include.order",
                                "Same-name header should be included first",
                                line_content=lines[self_incs[0][0] - 1] if self_incs[0][0] <= len(lines) else None))
@@ -506,7 +507,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
 
     # exp.padding: no space in operator keyword (operator++ not operator ++)
     if cfg.is_enabled("exp.padding"):
-        v.extend(_check_operator_padding(path, lines))
+        v.extend(_check_operator_padding(path, lines, content_bytes, nodes))
 
     # exp.linebreak: line breaks before binary operators
     if cfg.is_enabled("exp.linebreak"):
@@ -599,18 +600,20 @@ def _check_single_exp_braces(path: str, lines: list[str], content_bytes: bytes,
     return v
 
 
-def _check_operator_padding(path: str, lines: list[str]) -> list[Violation]:
+def _check_operator_padding(path: str, lines: list[str],
+                            content_bytes: bytes,
+                            nodes: NodeCache) -> list[Violation]:
     """Check no space in operator keyword (operator++ not operator ++)."""
     v = []
-    pattern = re.compile(r'\boperator\s+[^\s(]')
-    for i, line in enumerate(lines, 1):
-        s = line.strip()
-        if s.startswith(('#', '//', '/*', '*')):
-            continue
-        if m := pattern.search(line):
-            v.append(Violation(path, i, "exp.padding",
+    for node in nodes.get('operator_name'):
+        op_text = text(node, content_bytes)
+        # Check if there's a space between 'operator' and the symbol
+        if ' ' in op_text[len('operator'):]:
+            line_num = node.start_point[0] + 1
+            v.append(Violation(path, line_num, "exp.padding",
                                "No space between 'operator' and the operator symbol",
-                               line_content=line, column=m.start()))
+                               line_content=line_at(lines, node.start_point[0]),
+                               column=node.start_point[1]))
     return v
 
 
@@ -742,8 +745,8 @@ def _check_op_assign(path: str, lines: list[str], content_bytes: bytes,
     """Check that assignment operators return Class& and *this."""
     v = []
     for func in nodes.get('function_definition'):
-        func_text = text(func, content_bytes)
-        if 'operator=' not in func_text:
+        op_names = [text(n, content_bytes) for n in find_nodes(func, 'operator_name')]
+        if 'operator=' not in op_names:
             continue
 
         # Check return type includes & (reference)
@@ -784,20 +787,13 @@ def _check_forbidden_overloads(path: str, lines: list[str], content_bytes: bytes
                                severity: Severity = Severity.MAJOR) -> list[Violation]:
     """Check for forbidden operator overloads."""
     v = []
-    for node in nodes.get('function_definition', 'function_declarator',
-                          'field_declaration', 'declaration'):
-        node_text = text(node, content_bytes)
-        for op in forbidden:
-            if op in node_text:
-                # Find the actual function_declarator
-                for fd in find_nodes(node, 'function_declarator'):
-                    fd_text = text(fd, content_bytes)
-                    # Check the operator name precisely
-                    if op + '(' in fd_text or op + ' (' in fd_text:
-                        line_num = fd.start_point[0] + 1
-                        line_content = line_at(lines, fd.start_point[0])
-                        v.append(Violation(path, line_num, rule,
-                                           f"Don't overload {op}",
-                                           severity,
-                                           line_content=line_content))
+    for node in nodes.get('operator_name'):
+        op = text(node, content_bytes).replace(' ', '')
+        if op in forbidden:
+            line_num = node.start_point[0] + 1
+            line_content = line_at(lines, node.start_point[0])
+            v.append(Violation(path, line_num, rule,
+                               f"Don't overload {op}",
+                               severity,
+                               line_content=line_content))
     return v
