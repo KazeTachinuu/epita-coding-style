@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "epita-coding-style"
-version = "3.1.0"
+version = "3.1.3"
 description = "EPITA C/C++ Coding Style Checker - validates C and C++ code against EPITA coding standards"
 readme = "README.md"
 requires-python = ">=3.10"
