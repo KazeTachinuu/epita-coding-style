@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import sys
+import threading
 import urllib.request
 from pathlib import Path
 
@@ -209,7 +210,7 @@ def _check_for_update() -> str | None:
     try:
         url = "https://pypi.org/pypi/epita-coding-style/json"
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=2) as resp:
+        with urllib.request.urlopen(req, timeout=1) as resp:
             data = json.loads(resp.read())
         latest = data["info"]["version"]
         if _parse_version(latest) > _parse_version(__version__):
@@ -222,7 +223,33 @@ def _check_for_update() -> str | None:
     return None
 
 
+_update_result: str | None = None
+_update_done = threading.Event()
+
+
+def _start_update_check() -> None:
+    """Fire-and-forget version check in a daemon thread."""
+    def _worker():
+        global _update_result
+        _update_result = _check_for_update()
+        _update_done.set()
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def _print_update_msg() -> None:
+    """Print update message if the background check finished in time."""
+    if not _update_done.wait(timeout=1):
+        return
+    if _update_result:
+        C = "\033[36m" if sys.stderr.isatty() else ""
+        RST = "\033[0m" if sys.stderr.isatty() else ""
+        print(f"{C}{_update_result}{RST}", file=sys.stderr)
+
+
 def main():
+    _start_update_check()
+
     # Build epilog with config file and preset info
     epilog = """\
 Configuration:
@@ -285,10 +312,15 @@ Exit codes:
                             help='list all rules with descriptions')
     info_group.add_argument('--show-config', action='store_true',
                             help='show effective configuration and exit')
-    info_group.add_argument('-v', '--version', action='version',
-                            version=f'%(prog)s {__version__}')
+    info_group.add_argument('-v', '--version', action='store_true',
+                            help='show program\'s version number and exit')
 
     args = ap.parse_args()
+
+    if args.version:
+        print(f'epita-coding-style {__version__}')
+        _print_update_msg()
+        return 0
 
     # Determine if we should use colors:
     # --no-color flag > NO_COLOR env > FORCE_COLOR env > isatty()
@@ -301,6 +333,7 @@ Exit codes:
 
     if args.list_rules:
         _print_rules(use_color=use_color)
+        _print_update_msg()
         return 0
 
     cfg = load_config(
@@ -313,6 +346,7 @@ Exit codes:
 
     if args.show_config:
         _print_config(cfg, use_color=use_color)
+        _print_update_msg()
         return 0
 
     if not args.paths:
@@ -361,11 +395,7 @@ Exit codes:
     if files_needing_format:
         print(f"\n{Y}Fix formatting:{RST} clang-format -i {' '.join(files_needing_format)}")
 
-    # Check for newer version (only in interactive TTY sessions)
-    if sys.stderr.isatty():
-        update_msg = _check_for_update()
-        if update_msg:
-            print(f"\n{C}{update_msg}{RST}", file=sys.stderr)
+    _print_update_msg()
 
     return 1 if total_major > 0 else 0
 
