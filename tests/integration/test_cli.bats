@@ -114,36 +114,47 @@ EOF
     cat > "$TMP_DIR/bad_funcs.c" << 'EOF'
 void f1(void)
 {
+    return;
 }
 void f2(void)
 {
+    return;
 }
 void f3(void)
 {
+    return;
 }
 void f4(void)
 {
+    return;
 }
 void f5(void)
 {
+    return;
 }
 void f6(void)
 {
+    return;
 }
 void f7(void)
 {
+    return;
 }
 void f8(void)
 {
+    return;
 }
 void f9(void)
 {
+    return;
 }
 void f10(void)
 {
+    return;
 }
 void f11(void)
 {
+    return;
 }
 EOF
 }
