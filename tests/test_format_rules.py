@@ -22,11 +22,11 @@ def test_format_disabled(check_result):
     assert not violations
 
 
-def test_format_is_minor(format_check):
-    """Format violations should be MINOR severity."""
+def test_format_is_major(format_check):
+    """Format violations should be MAJOR severity."""
     _, fmt = format_check("int main(void){return 0;}\n", ".c")
     assert fmt
-    assert all(v.severity == Severity.MINOR for v in fmt)
+    assert all(v.severity == Severity.MAJOR for v in fmt)
 
 
 # ── C: positive (should pass) ───────────────────────────────────────────

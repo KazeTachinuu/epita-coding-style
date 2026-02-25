@@ -437,7 +437,7 @@ def check_clang_format(path: str, cfg: Config) -> list[Violation]:
                 msg = f"{count} line{'s' if count > 1 else ''} need{'s' if count == 1 else ''} formatting"
             else:
                 msg = "Needs formatting"
-            return [Violation(path, 1, "format", msg, Severity.MINOR)]
+            return [Violation(path, 1, "format", msg, Severity.MAJOR)]
     except (subprocess.TimeoutExpired, subprocess.SubprocessError):
         pass
 
