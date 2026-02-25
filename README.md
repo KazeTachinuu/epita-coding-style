@@ -26,6 +26,22 @@ epita-coding-style --show-config  # Show current configuration
 epita-coding-style --help         # Full usage info
 ```
 
+## Example Output
+
+```
+$ epita-coding-style src/
+src/rbtree.c:1:1: error: No blank lines at start of file [epita-file.spurious]
+
+src/rbtree.c:307:1: error: 'rb_delete_cases' has 5 args (max 4) [epita-fun.arg.count]
+static void rb_delete_cases(struct rb_node **node, struct rb_node **tmp,
+src/rbtree.c:12:1: error: 2 exported globals (max 1) [epita-export.other]
+src/rbtree.c:1:1: error: 36 lines need formatting [epita-format]
+
+Files: 1  Major: 4  Minor: 0
+
+Fix formatting: clang-format -i src/rbtree.c
+```
+
 ## Supported File Extensions
 
 | Language | Source | Header |
