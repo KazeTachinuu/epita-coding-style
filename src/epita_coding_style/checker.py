@@ -248,8 +248,6 @@ def _print_update_msg() -> None:
 
 
 def main():
-    _start_update_check()
-
     # Build epilog with config file and preset info
     epilog = """\
 Configuration:
@@ -316,6 +314,7 @@ Exit codes:
                             help='show program\'s version number and exit')
 
     args = ap.parse_args()
+    _start_update_check()
 
     if args.version:
         print(f'epita-coding-style {__version__}')
@@ -360,6 +359,7 @@ Exit codes:
     files = find_files(args.paths)
     if not files:
         print(f"{R}No C/C++ files found{RST}", file=sys.stderr)
+        _print_update_msg()
         return 1
 
     total_major = total_minor = 0
