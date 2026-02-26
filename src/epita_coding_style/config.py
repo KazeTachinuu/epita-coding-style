@@ -93,7 +93,8 @@ class Config:
     max_funcs: int = 10
     max_globals: int = 1
 
-    # Rule toggles (all enabled by default for strict EPITA compliance)
+    _user_rules: set[str] = field(default_factory=set)
+
     rules: dict[str, bool] = field(default_factory=lambda: {
         # File format
         "file.dos": True,
@@ -178,14 +179,13 @@ class Config:
             "op.assign", "op.overload", "op.overload.binand", "enum.class",
         ]
         for rule in cxx_rules:
-            cfg.rules[rule] = True
-        # Disable C-only rules
-        cfg.rules["cpp.guard"] = False
-        cfg.rules["export.fun"] = False
-        cfg.rules["export.other"] = False
-        cfg.rules["fun.proto.void"] = False
-        cfg.rules["keyword.goto"] = False
-        cfg.rules["cast"] = False
+            if rule not in cfg._user_rules:
+                cfg.rules[rule] = True
+        c_only_rules = ["cpp.guard", "export.fun", "export.other",
+                        "fun.proto.void", "keyword.goto", "cast"]
+        for rule in c_only_rules:
+            if rule not in cfg._user_rules:
+                cfg.rules[rule] = False
         # CXX uses 50-line max (only if user hasn't overridden)
         if cfg.max_lines == Config().max_lines:
             cfg.max_lines = 50
@@ -274,5 +274,6 @@ def _apply_dict(cfg: Config, data: dict[str, Any]) -> None:
     for key, val in data.items():
         if key == "rules" and isinstance(val, dict):
             cfg.rules.update(val)
+            cfg._user_rules.update(val.keys())
         elif hasattr(cfg, key):
             setattr(cfg, key, val)

@@ -72,12 +72,26 @@ def test_with_cxx_max_lines_50():
     assert Config().with_cxx().max_lines == 50
 
 
-def test_with_cxx_overrides_user_disabled_cxx_rule():
-    """User disabling a CXX rule should persist through with_cxx()."""
+def test_with_cxx_respects_user_disabled_cxx_rule():
+    """User disabling a CXX rule via config should persist through with_cxx()."""
     cfg = Config()
     cfg.rules["global.casts"] = False
-    # with_cxx enables all CXX rules, overriding user choice
-    # This is intentional — CXX rules are always on for CXX files
+    cfg._user_rules.add("global.casts")
+    assert not cfg.with_cxx().is_enabled("global.casts")
+
+
+def test_with_cxx_respects_user_enabled_c_only_rule():
+    """User enabling a C-only rule via config should persist through with_cxx()."""
+    cfg = Config()
+    cfg.rules["cpp.guard"] = True
+    cfg._user_rules.add("cpp.guard")
+    assert cfg.with_cxx().is_enabled("cpp.guard")
+
+
+def test_with_cxx_enables_cxx_rule_without_user_override():
+    """CXX rules are auto-enabled when user hasn't explicitly set them."""
+    cfg = Config()
+    assert not cfg.is_enabled("global.casts")
     assert cfg.with_cxx().is_enabled("global.casts")
 
 
