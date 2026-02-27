@@ -8,12 +8,14 @@ from textwrap import dedent
 
 EMPTY_BODY_MULTILINE = "void foo()\n{\n}\n"
 EMPTY_BODY_SAME_LINE = "void foo() {}\n"
+EMPTY_BODY_SPACE = "void foo() { }\n"
 
 
 @pytest.mark.parametrize("code,should_fail", [
     (EMPTY_BODY_SAME_LINE, False),
     (EMPTY_BODY_MULTILINE, True),
-], ids=["same-line-ok", "multiline-bad"])
+    (EMPTY_BODY_SPACE, True),
+], ids=["same-line-ok", "multiline-bad", "space-inside-bad"])
 def test_braces_empty(check_cxx, code, should_fail):
     assert check_cxx(code, "braces.empty") == should_fail
 
@@ -38,11 +40,63 @@ IF_WITH_BRACES = dedent("""\
     }
 """)
 
+ELSE_WITHOUT_BRACES = dedent("""\
+    void foo()
+    {
+        if (true)
+        {
+            return;
+        }
+        else
+            return;
+    }
+""")
+
+ELSE_WITH_BRACES = dedent("""\
+    void foo()
+    {
+        if (true)
+        {
+            return;
+        }
+        else
+        {
+            return;
+        }
+    }
+""")
+
+DO_WITHOUT_BRACES = dedent("""\
+    void foo()
+    {
+        do
+            continue;
+        while (true);
+    }
+""")
+
+DO_WITH_BRACES = dedent("""\
+    void foo()
+    {
+        do
+        {
+            continue;
+        }
+        while (true);
+    }
+""")
+
 
 @pytest.mark.parametrize("code,should_fail", [
     (IF_WITH_BRACES, False),
     (IF_WITHOUT_BRACES, True),
-], ids=["with-braces-ok", "without-braces-bad"])
+    (ELSE_WITH_BRACES, False),
+    (ELSE_WITHOUT_BRACES, True),
+    (DO_WITH_BRACES, False),
+    (DO_WITHOUT_BRACES, True),
+], ids=["if-with-braces-ok", "if-without-braces-bad",
+        "else-with-braces-ok", "else-without-braces-bad",
+        "do-with-braces-ok", "do-without-braces-bad"])
 def test_braces_single_exp(check_cxx, code, should_fail):
     assert check_cxx(code, "braces.single_exp") == should_fail
 
@@ -52,13 +106,15 @@ def test_braces_single_exp(check_cxx, code, should_fail):
 THROW_INTEGER = "void foo() { throw 42; }\n"
 THROW_STRING = 'void foo() { throw "error"; }\n'
 THROW_EXCEPTION = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("err"); }\n'
+THROW_NEW = '#include <stdexcept>\nvoid foo() { throw new std::runtime_error("err"); }\n'
 
 
 @pytest.mark.parametrize("code,should_fail", [
     (THROW_EXCEPTION, False),
     (THROW_INTEGER, True),
     (THROW_STRING, True),
-], ids=["exception-ok", "integer-bad", "string-bad"])
+    (THROW_NEW, True),
+], ids=["exception-ok", "integer-bad", "string-bad", "throw-new-bad"])
 def test_err_throw(check_cxx, code, should_fail):
     assert check_cxx(code, "err.throw") == should_fail
 

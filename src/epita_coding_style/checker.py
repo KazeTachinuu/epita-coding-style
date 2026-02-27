@@ -13,25 +13,14 @@ from pathlib import Path
 
 from . import __version__
 from .config import Config, PRESETS, RULES_META, load_config
-from .core import Violation, Severity, parse, parse_cpp, NodeCache, Lang, lang_from_path, ALL_EXTS, C_EXTS, CXX_EXTS, CXX_BAD_EXTS
+from .core import Violation, Severity, parse, parse_cpp, NodeCache, Lang, lang_from_path, ALL_EXTS, CXX_BAD_EXTS
 from .checks import (
-    check_file_format,
-    check_braces,
-    check_functions,
-    check_exports,
-    check_preprocessor,
-    check_misc,
-    check_vla,
-    check_ctrl_empty,
-    check_clang_format,
+    check_file_format, check_braces, check_functions, check_exports,
+    check_preprocessor, check_misc, check_vla, check_ctrl_empty, check_clang_format,
 )
 from .checks_cxx import (
-    check_cxx_preprocessor,
-    check_cxx_globals,
-    check_cxx_naming,
-    check_cxx_declarations,
-    check_cxx_control,
-    check_cxx_writing,
+    check_cxx_preprocessor, check_cxx_globals, check_cxx_naming,
+    check_cxx_declarations, check_cxx_control, check_cxx_writing,
 )
 
 
@@ -69,7 +58,7 @@ def _check_c_file(path: str, cfg: Config, content: str, lines: list[str],
         check_preprocessor(path, lines, cfg) +
         check_misc(path, nodes, content_bytes, lines, cfg) +
         check_vla(path, nodes, content_bytes, lines, cfg) +
-        check_ctrl_empty(path, lines, cfg) +
+        check_ctrl_empty(path, lines, cfg, nodes=nodes) +
         check_clang_format(path, cfg)
     )
 
@@ -351,10 +340,7 @@ Exit codes:
     if not args.paths:
         ap.error("PATH is required")
 
-    if use_color:
-        R, Y, C, W, B, RST = '\033[91m', '\033[93m', '\033[96m', '\033[97m', '\033[1m', '\033[0m'
-    else:
-        R = Y = C = W = B = RST = ''
+    R, Y, W, RST = ('\033[91m', '\033[93m', '\033[97m', '\033[0m') if use_color else ('', '', '', '')
 
     files = find_files(args.paths)
     if not files:
@@ -367,26 +353,30 @@ Exit codes:
 
     for path in files:
         violations = check_file(path, cfg)
+        if not violations:
+            continue
 
-        major = sum(1 for v in violations if v.severity == Severity.MAJOR)
-        minor = sum(1 for v in violations if v.severity == Severity.MINOR)
-        total_major += major
-        total_minor += minor
+        has_format = False
+        for v in violations:
+            if v.severity == Severity.MAJOR:
+                total_major += 1
+            else:
+                total_minor += 1
+            if v.rule == "format":
+                has_format = True
 
-        # Track files needing clang-format
-        if any(v.rule == "format" for v in violations):
-            files_needing_format.append(path)
-
-        if not args.quiet and violations:
-            for v in violations:
-                color = R if v.severity == Severity.MAJOR else Y
+            if not args.quiet:
+                is_major = v.severity == Severity.MAJOR
+                color = R if is_major else Y
                 col_str = f":{v.column + 1}" if v.column is not None else ":1"
-                severity_word = "error" if v.severity == Severity.MAJOR else "warning"
-                print(f"{color}{path}:{v.line}{col_str}: {severity_word}: {v.message} [epita-{v.rule}]{RST}")
+                print(f"{color}{path}:{v.line}{col_str}: {'error' if is_major else 'warning'}: {v.message} [epita-{v.rule}]{RST}")
                 if v.line_content is not None:
                     print(f"{v.line_content}")
                     if v.column is not None:
                         print(f"{' ' * v.column}{color}^{RST}")
+
+        if has_format:
+            files_needing_format.append(path)
 
     # Summary
     print(f"\n{W}Files: {len(files)}  Major: {R}{total_major}{RST}  Minor: {Y}{total_minor}{RST}")

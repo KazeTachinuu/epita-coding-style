@@ -8,11 +8,14 @@ import shutil
 import subprocess
 
 from .config import Config
-from .core import Violation, Severity, NodeCache, text, find_id, find_nodes, line_at, C_EXTS, Lang, lang_from_path
+from .core import Violation, Severity, NodeCache, text, find_id, find_nodes, line_at, Lang, lang_from_path
 
 # Pre-compiled regex patterns
 _CHAR_LITERAL = re.compile(r"'(?:\\.|[^'\\])'")
+_INIT_ASSIGN = re.compile(r'(?<![!=<>])=(?!=)')
 _CLANG_ERROR = re.compile(r'^.*:(\d+):\d+: (?:error|warning):')
+_DIGRAPHS = ('??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%', '%>', '<:', ':>')
+_ASM_KEYWORDS = ('asm(', '__asm__', '__asm')
 
 
 def check_file_format(path: str, content: str, lines: list[str], cfg: Config) -> list[Violation]:
@@ -82,7 +85,7 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
         if '{' in clean:
             pos = clean.find('{')
             before = clean[:pos].strip()
-            is_init = bool(re.search(r'(?<![!=<>])=(?!=)', before))
+            is_init = bool(_INIT_ASSIGN.search(before))
             if before and not is_init and clean.strip() not in ('{}', '{ }') and before != 'do':
                 if not line.rstrip().endswith('\\'):
                     col = line.find('{')
@@ -124,6 +127,11 @@ def _find_function_declarator(node):
 def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
     """Check function rules using AST."""
     v = []
+    chk_void = cfg.is_enabled("fun.proto.void")
+    chk_args = cfg.is_enabled("fun.arg.count")
+    chk_len = cfg.is_enabled("fun.length")
+    max_args = cfg.max_args
+    max_lines = cfg.max_lines
 
     for func in nodes.get('function_definition'):
         line_num = func.start_point[0] + 1
@@ -135,9 +143,7 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
         for child in func.children:
             func_decl = _find_function_declarator(child)
             if func_decl:
-                # Find name (may be inside parenthesized_declarator for complex decls)
                 name = find_id(func_decl, content)
-                # Find parameter list
                 for c in func_decl.children:
                     if c.type == 'parameter_list':
                         params = [p for p in c.children if p.type == 'parameter_declaration']
@@ -147,19 +153,18 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
         if not name:
             continue
 
-        if cfg.is_enabled("fun.proto.void"):
-            if not params and ('()' in text(func, content) or '( )' in text(func, content)):
-                v.append(Violation(path, line_num, "fun.proto.void", f"'{name}' should use (void) for empty params",
-                                  line_content=line_content))
-
-        if cfg.is_enabled("fun.arg.count") and len(params) > cfg.max_args:
-            v.append(Violation(path, line_num, "fun.arg.count", f"'{name}' has {len(params)} args (max {cfg.max_args})",
+        if chk_void and not params and ('()' in text(func, content) or '( )' in text(func, content)):
+            v.append(Violation(path, line_num, "fun.proto.void", f"'{name}' should use (void) for empty params",
                               line_content=line_content))
 
-        if cfg.is_enabled("fun.length") and body:
+        if chk_args and len(params) > max_args:
+            v.append(Violation(path, line_num, "fun.arg.count", f"'{name}' has {len(params)} args (max {max_args})",
+                              line_content=line_content))
+
+        if chk_len and body:
             count = count_function_lines(body, lines)
-            if count > cfg.max_lines:
-                v.append(Violation(path, line_num, "fun.length", f"Function has {count} lines (max {cfg.max_lines})",
+            if count > max_lines:
+                v.append(Violation(path, line_num, "fun.length", f"Function has {count} lines (max {max_lines})",
                                   line_content=line_content))
 
     # Header declarations
@@ -198,18 +203,17 @@ def check_exports(path: str, nodes: NodeCache, content: bytes, cfg: Config) -> l
     v = []
 
     if cfg.is_enabled("export.fun"):
-        exported = []
+        count = 0
         for func in nodes.get('function_definition'):
-            is_static = any(text(c, content) == 'static' for c in func.children if c.type == 'storage_class_specifier')
-            if not is_static:
-                for child in func.children:
-                    func_decl = _find_function_declarator(child)
-                    if func_decl:
-                        if name := find_id(func_decl, content):
-                            exported.append(name)
-
-        if len(exported) > cfg.max_funcs:
-            v.append(Violation(path, 1, "export.fun", f"{len(exported)} exported functions (max {cfg.max_funcs})"))
+            if any(text(c, content) == 'static' for c in func.children if c.type == 'storage_class_specifier'):
+                continue
+            for child in func.children:
+                func_decl = _find_function_declarator(child)
+                if func_decl and find_id(func_decl, content):
+                    count += 1
+                    break
+        if count > cfg.max_funcs:
+            v.append(Violation(path, 1, "export.fun", f"{count} exported functions (max {cfg.max_funcs})"))
 
     if cfg.is_enabled("export.other"):
         globals_found = []
@@ -244,23 +248,30 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
             v.append(Violation(path, 1, "cpp.guard", f"Missing include guard (#ifndef {guard})",
                               line_content=lines[0] if lines else None))
 
+    check_mark = cfg.is_enabled("cpp.mark")
+    check_if = cfg.is_enabled("cpp.if")
+    check_digraphs = cfg.is_enabled("cpp.digraphs")
+    if not (check_mark or check_if or check_digraphs):
+        return v
+
     for i, line in enumerate(lines, 1):
         s = line.strip()
 
-        if cfg.is_enabled("cpp.mark") and s.startswith('#') and line[0] != '#':
+        if check_mark and s.startswith('#') and line[0] != '#':
             v.append(Violation(path, i, "cpp.mark", "# must be on first column",
                               line_content=line, column=0))
 
-        if cfg.is_enabled("cpp.if") and s.startswith('#endif') and '//' not in s and '/*' not in s:
-            v.append(Violation(path, i, "cpp.if", "#endif should have comment", Severity.MINOR,
+        if check_if and (s.startswith('#endif') or s.startswith('#else')) \
+                and '//' not in s and '/*' not in s:
+            directive = '#else' if s.startswith('#else') else '#endif'
+            v.append(Violation(path, i, "cpp.if", f"{directive} should have comment", Severity.MINOR,
                               line_content=line))
 
-        if cfg.is_enabled("cpp.digraphs"):
-            for d in ['??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%', '%>', '<:', ':>']:
+        if check_digraphs:
+            for d in _DIGRAPHS:
                 if d in line:
-                    col = line.find(d)
                     v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
-                                      line_content=line, column=col))
+                                      line_content=line, column=line.find(d)))
 
     return v
 
@@ -272,39 +283,43 @@ def check_vla(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg
     v = []
     for decl in nodes.get('declaration'):
         for arr in find_nodes(decl, 'array_declarator'):
-            children = arr.children
-            in_brackets = False
+            # Find the size expression between [ and ]
             size = None
-            for child in children:
+            for child in arr.children:
                 if child.type == '[':
-                    in_brackets = True
+                    size = None
                 elif child.type == ']':
                     break
-                elif in_brackets:
+                else:
                     size = child
-            if size is None:
-                continue
-            size_text = text(size, content)
-            if size.type == 'identifier' and not size_text.isupper():
-                line_num = arr.start_point[0] + 1
-                v.append(Violation(path, line_num, "decl.vla", "VLA not allowed",
+            if size and size.type == 'identifier' and not text(size, content).isupper():
+                v.append(Violation(path, arr.start_point[0] + 1, "decl.vla",
+                                  "VLA not allowed",
                                   line_content=line_at(lines, arr.start_point[0]),
                                   column=arr.start_point[1]))
     return v
 
 
-def check_ctrl_empty(path: str, lines: list[str], cfg: Config) -> list[Violation]:
+def check_ctrl_empty(path: str, lines: list[str], cfg: Config,
+                     nodes: NodeCache | None = None) -> list[Violation]:
     """Check for empty loop bodies. Shared between C and C++."""
     if not cfg.is_enabled("ctrl.empty"):
         return []
     v = []
+    if nodes is not None:
+        for node in nodes.get('for_statement', 'while_statement'):
+            for child in node.children:
+                if child.type == 'expression_statement' \
+                        and all(c.type == ';' for c in child.children):
+                    v.append(Violation(path, child.start_point[0] + 1, "ctrl.empty",
+                                      "Use 'continue' for empty loops",
+                                      line_content=line_at(lines, child.start_point[0])))
+        return v
+    # Line-based fallback
     for i, line in enumerate(lines, 1):
-        s = line.strip()
-        if s == ';' and i > 1:
-            prev = lines[i - 2].strip()
-            if prev.startswith(('for', 'while')):
-                v.append(Violation(path, i, "ctrl.empty", "Use 'continue' for empty loops",
-                                  line_content=line))
+        if line.strip() == ';' and i > 1 and lines[i - 2].strip().startswith(('for', 'while')):
+            v.append(Violation(path, i, "ctrl.empty", "Use 'continue' for empty loops",
+                              line_content=line))
     return v
 
 
@@ -319,13 +334,16 @@ def count_function_lines(body, lines: list[str]) -> int:
     return count
 
 
-def _clang_format_candidates(lang: Lang | None) -> list[str]:
-    """Return ordered list of clang-format config filenames for a language."""
-    if lang == Lang.C:
-        return [".clang-format-c", ".clang-format"]
-    elif lang == Lang.CXX:
-        return [".clang-format-cxx", ".clang-format"]
-    return [".clang-format"]
+_CLANG_FORMAT_CANDIDATES = {
+    Lang.C: (".clang-format-c", ".clang-format"),
+    Lang.CXX: (".clang-format-cxx", ".clang-format"),
+}
+_CLANG_FORMAT_DEFAULT = (".clang-format",)
+
+
+def _clang_format_candidates(lang: Lang | None) -> tuple[str, ...]:
+    """Return ordered clang-format config filenames for a language."""
+    return _CLANG_FORMAT_CANDIDATES.get(lang, _CLANG_FORMAT_DEFAULT)
 
 
 def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
@@ -349,11 +367,10 @@ def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cf
                 v.append(Violation(path, line_num, "decl.single", "One declaration per line",
                                   line_content=line_content, column=col))
 
-    for i, line in enumerate(lines, 1):
-        s = line.strip()
-
-        if cfg.is_enabled("stat.asm"):
-            if any(kw in s for kw in ['asm(', '__asm__', '__asm']):
+    if cfg.is_enabled("stat.asm"):
+        for i, line in enumerate(lines, 1):
+            s = line.strip()
+            if any(kw in s for kw in _ASM_KEYWORDS):
                 v.append(Violation(path, i, "stat.asm", "asm not allowed",
                                   line_content=line))
 

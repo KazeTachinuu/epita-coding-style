@@ -22,6 +22,28 @@ ENDIF_NO_COMMENT = dedent("""\
     #endif
 """)
 
+ELSE_WITH_COMMENT = dedent("""\
+    #ifndef TEST_H
+    #define TEST_H
+    #ifdef FOO
+    int x;
+    #else /* !FOO */
+    int y;
+    #endif /* FOO */
+    #endif /* TEST_H */
+""")
+
+ELSE_NO_COMMENT = dedent("""\
+    #ifndef TEST_H
+    #define TEST_H
+    #ifdef FOO
+    int x;
+    #else
+    int y;
+    #endif /* FOO */
+    #endif /* TEST_H */
+""")
+
 
 @pytest.mark.parametrize("code,should_fail", [
     (GUARD_OK, False),
@@ -34,7 +56,9 @@ def test_cpp_guard(check, code, should_fail):
 @pytest.mark.parametrize("code,should_fail", [
     (ENDIF_OK, False),
     (ENDIF_NO_COMMENT, True),
-], ids=["endif-comment-ok", "endif-no-comment"])
+    (ELSE_WITH_COMMENT, False),
+    (ELSE_NO_COMMENT, True),
+], ids=["endif-comment-ok", "endif-no-comment", "else-comment-ok", "else-no-comment"])
 def test_cpp_endif_comment(check, code, should_fail):
     assert check(code, "cpp.if", suffix=".h") == should_fail
 

@@ -17,7 +17,6 @@ class Lang(Enum):
     CXX = "CXX"
 
 
-# File extension to language mapping
 _EXT_LANG = {
     '.c': Lang.C, '.h': Lang.C,
     '.cc': Lang.CXX, '.hh': Lang.CXX, '.hxx': Lang.CXX,
@@ -46,39 +45,28 @@ class Violation:
     column: int | None = None
 
 
-# Lazy-loaded parsers
 _c_parser = None
 _cpp_parser = None
 
 
-def _get_c_parser():
-    """Get or create the C tree-sitter parser."""
+def parse(content: bytes):
+    """Parse C code and return AST root."""
     global _c_parser
     if _c_parser is None:
         from tree_sitter import Language, Parser
         import tree_sitter_c as tsc
         _c_parser = Parser(Language(tsc.language()))
-    return _c_parser
+    return _c_parser.parse(content).root_node
 
 
-def _get_cpp_parser():
-    """Get or create the C++ tree-sitter parser."""
+def parse_cpp(content: bytes):
+    """Parse C++ code and return AST root."""
     global _cpp_parser
     if _cpp_parser is None:
         from tree_sitter import Language, Parser
         import tree_sitter_cpp as tscpp
         _cpp_parser = Parser(Language(tscpp.language()))
-    return _cpp_parser
-
-
-def parse(content: bytes):
-    """Parse C code and return AST root."""
-    return _get_c_parser().parse(content).root_node
-
-
-def parse_cpp(content: bytes):
-    """Parse C++ code and return AST root."""
-    return _get_cpp_parser().parse(content).root_node
+    return _cpp_parser.parse(content).root_node
 
 
 class NodeCache:
@@ -98,10 +86,13 @@ class NodeCache:
 
 def find_nodes(node, *types):
     """Yield all descendant nodes matching given types."""
-    if node.type in types:
-        yield node
-    for child in node.children:
-        yield from find_nodes(child, *types)
+    type_set = set(types) if len(types) > 2 else types
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        if n.type in type_set:
+            yield n
+        stack.extend(reversed(n.children))
 
 
 def text(node, content: bytes) -> str:
@@ -115,10 +106,11 @@ def line_at(lines: list[str], index: int) -> str | None:
 
 
 def find_id(node, content: bytes) -> str | None:
-    """Recursively find first identifier in a node."""
-    if node.type == 'identifier':
-        return text(node, content)
-    for child in node.children:
-        if name := find_id(child, content):
-            return name
+    """Find first identifier in a node (iterative)."""
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        if n.type == 'identifier':
+            return text(n, content)
+        stack.extend(reversed(n.children))
     return None

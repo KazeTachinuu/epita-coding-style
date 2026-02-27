@@ -87,7 +87,6 @@ RULES_META: dict[str, tuple[str, str]] = {
 class Config:
     """Checker configuration."""
 
-    # Numeric limits
     max_lines: int = 30
     max_args: int = 4
     max_funcs: int = 10
@@ -163,31 +162,34 @@ class Config:
         """Check if a rule is enabled."""
         return self.rules.get(rule, True)
 
+    _CXX_RULES = frozenset({
+        "file.ext", "cpp.pragma.once", "cpp.include.filetype", "cpp.include.order",
+        "cpp.constexpr", "global.casts", "global.memory.no_malloc",
+        "global.nullptr", "c.extern", "c.headers", "c.std_functions",
+        "naming.class", "naming.namespace", "decl.ref", "decl.ctor.explicit",
+        "decl.point", "ctrl.switch", "ctrl.switch.padding",
+        "braces.empty", "braces.single_exp", "err.throw", "err.throw.catch",
+        "err.throw.paren", "exp.padding", "exp.linebreak", "fun.proto.void.cxx",
+        "op.assign", "op.overload", "op.overload.binand", "enum.class",
+    })
+
+    _C_ONLY_RULES = frozenset({
+        "cpp.guard", "export.fun", "export.other",
+        "fun.proto.void", "keyword.goto", "cast",
+    })
+
+    _DEFAULT_MAX_LINES = 30
+
     def with_cxx(self) -> "Config":
         """Return a copy with CXX rules enabled and C-only rules disabled."""
         import copy
         cfg = copy.deepcopy(self)
-        cxx_rules = [
-            "file.ext",
-            "cpp.pragma.once", "cpp.include.filetype", "cpp.include.order",
-            "cpp.constexpr", "global.casts", "global.memory.no_malloc",
-            "global.nullptr", "c.extern", "c.headers", "c.std_functions",
-            "naming.class", "naming.namespace", "decl.ref", "decl.ctor.explicit",
-            "decl.point", "ctrl.switch", "ctrl.switch.padding",
-            "braces.empty", "braces.single_exp", "err.throw", "err.throw.catch",
-            "err.throw.paren", "exp.padding", "exp.linebreak", "fun.proto.void.cxx",
-            "op.assign", "op.overload", "op.overload.binand", "enum.class",
-        ]
-        for rule in cxx_rules:
-            if rule not in cfg._user_rules:
-                cfg.rules[rule] = True
-        c_only_rules = ["cpp.guard", "export.fun", "export.other",
-                        "fun.proto.void", "keyword.goto", "cast"]
-        for rule in c_only_rules:
-            if rule not in cfg._user_rules:
-                cfg.rules[rule] = False
-        # CXX uses 50-line max (only if user hasn't overridden)
-        if cfg.max_lines == Config().max_lines:
+        user = cfg._user_rules
+        for rule in self._CXX_RULES - user:
+            cfg.rules[rule] = True
+        for rule in self._C_ONLY_RULES - user:
+            cfg.rules[rule] = False
+        if cfg.max_lines == self._DEFAULT_MAX_LINES:
             cfg.max_lines = 50
         return cfg
 

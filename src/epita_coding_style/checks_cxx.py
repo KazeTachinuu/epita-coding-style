@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import re
 
 from .config import Config
 from .core import Violation, Severity, NodeCache, text, find_id, find_nodes, line_at
 from .checks import check_vla, check_ctrl_empty, count_function_lines
 
-# C standard headers that should be replaced with C++ equivalents
 _C_HEADERS = {
     "assert.h", "complex.h", "ctype.h", "errno.h", "fenv.h", "float.h",
     "inttypes.h", "iso646.h", "limits.h", "locale.h", "math.h", "setjmp.h",
@@ -33,9 +33,14 @@ _FORBIDDEN_OPS = {"operator,", "operator||", "operator&&"}
 
 _CAMEL_CASE = re.compile(r'^[A-Z][a-zA-Z0-9]*$')
 _LOWER_NS = re.compile(r'^[a-z_][a-z0-9_]*$')
+_REF_PATTERN = re.compile(r'(\w)\s+&(\w)')
+_PTR_PATTERN = re.compile(r'(\w)\s+\*(\w)')
 
-# Source file extensions that should not be #included
-_SOURCE_EXTS = {".cc", ".cpp", ".cxx", ".c"}
+_LITERAL_TYPES = frozenset(('number_literal', 'string_literal', 'char_literal',
+                            'true', 'false', 'null', 'nullptr'))
+_STMT_TYPES = frozenset(('expression_statement', 'return_statement', 'break_statement',
+                         'continue_statement', 'throw_statement'))
+_DECL_TYPES = frozenset(('declaration', 'field_declaration', 'function_definition'))
 
 
 def check_cxx_preprocessor(path: str, lines: list[str], content_bytes: bytes,
@@ -43,7 +48,6 @@ def check_cxx_preprocessor(path: str, lines: list[str], content_bytes: bytes,
     """Check CXX preprocessor rules: pragma.once, include.filetype, include.order, constexpr."""
     v = []
 
-    # pragma.once: header files must use #pragma once
     if cfg.is_enabled("cpp.pragma.once") and path.endswith(('.hh', '.hxx')):
         has_pragma = any(line.strip() == '#pragma once' for line in lines)
         if not has_pragma:
@@ -51,27 +55,20 @@ def check_cxx_preprocessor(path: str, lines: list[str], content_bytes: bytes,
                                "Use #pragma once instead of include guards",
                                line_content=lines[0] if lines else None))
 
-    # include.filetype: only .hh/.hxx includes (no source files)
     if cfg.is_enabled("cpp.include.filetype"):
         for inc in nodes.get('preproc_include'):
-            inc_text = text(inc, content_bytes)
-            # Extract the included filename
             for child in inc.children:
                 if child.type == 'string_literal':
                     fname = text(child, content_bytes).strip('"')
-                    for ext in _SOURCE_EXTS:
-                        if fname.endswith(ext):
-                            line_num = inc.start_point[0] + 1
-                            v.append(Violation(path, line_num, "cpp.include.filetype",
-                                               f"Don't include source file '{fname}'",
-                                               line_content=line_at(lines, inc.start_point[0])))
-                            break
+                    if not fname.endswith(('.hh', '.hxx')):
+                        line_num = inc.start_point[0] + 1
+                        v.append(Violation(path, line_num, "cpp.include.filetype",
+                                           f"Included file '{fname}' should have .hh or .hxx extension",
+                                           line_content=line_at(lines, inc.start_point[0])))
 
-    # include.order: same-name header first, then system, then local
     if cfg.is_enabled("cpp.include.order"):
         v.extend(_check_include_order(path, lines, nodes, content_bytes))
 
-    # constexpr: compile-time constants should use constexpr
     if cfg.is_enabled("cpp.constexpr"):
         for decl in nodes.root.children:
             if decl.type != 'declaration':
@@ -98,9 +95,8 @@ def check_cxx_preprocessor(path: str, lines: list[str], content_bytes: bytes,
 def _check_include_order(path: str, lines: list[str], nodes: NodeCache,
                          content_bytes: bytes) -> list[Violation]:
     """Check that includes are ordered: same-name header, system, local."""
-    import os
-    v = []
     base = os.path.splitext(os.path.basename(path))[0]
+    v = []
 
     includes = []
     for inc in nodes.get('preproc_include'):
@@ -130,14 +126,52 @@ def _check_include_order(path: str, lines: list[str], nodes: NodeCache,
                                line_content=lines[self_incs[0][0] - 1] if self_incs[0][0] <= len(lines) else None))
 
     # Find first local that comes before a system include
+    found_order_violation = False
     for i, (line_num, kind, _) in enumerate(includes):
         if kind == 'local':
-            for line_num2, kind2, _ in includes[i + 1:]:
+            for _, kind2, _ in includes[i + 1:]:
                 if kind2 == 'system':
                     v.append(Violation(path, line_num, "cpp.include.order",
                                        "System includes should come before local includes",
                                        line_content=lines[line_num - 1] if line_num <= len(lines) else None))
-                    return v  # Report only once
+                    found_order_violation = True
+                    break
+            if found_order_violation:
+                break
+
+    # Check alphabetical order within each group
+    groups: dict[str, list[tuple[int, str]]] = {}
+    for line_num, kind, fname in includes:
+        groups.setdefault(kind, []).append((line_num, fname))
+    for kind, items in groups.items():
+        for j in range(1, len(items)):
+            prev_name = items[j - 1][1].lower()
+            curr_name = items[j][1].lower()
+            if curr_name < prev_name:
+                v.append(Violation(path, items[j][0], "cpp.include.order",
+                                   f"Includes not in alphabetical order: '{items[j][1]}' before '{items[j - 1][1]}'",
+                                   Severity.MINOR,
+                                   line_content=lines[items[j][0] - 1] if items[j][0] <= len(lines) else None))
+                break  # one per group
+
+    # Check blank line between groups
+    prev_kind = None
+    prev_line = None
+    for line_num, kind, _ in includes:
+        if prev_kind is not None and kind != prev_kind:
+            # Check there's a blank line between prev_line and line_num (both 1-indexed)
+            has_blank = False
+            for idx in range(prev_line, line_num - 1):  # 0-indexed: prev_line..line_num-2
+                if idx < len(lines) and not lines[idx].strip():
+                    has_blank = True
+                    break
+            if not has_blank:
+                v.append(Violation(path, line_num, "cpp.include.order",
+                                   "Include groups should be separated by a blank line",
+                                   Severity.MINOR,
+                                   line_content=lines[line_num - 1] if line_num <= len(lines) else None))
+        prev_kind = kind
+        prev_line = line_num
 
     return v
 
@@ -147,7 +181,6 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
     """Check CXX global rules: casts, memory, nullptr, extern C, C headers, C functions."""
     v = []
 
-    # global.casts: no C-style casts
     if cfg.is_enabled("global.casts"):
         for node in nodes.get('cast_expression'):
             line_num = node.start_point[0] + 1
@@ -156,40 +189,43 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
                                "Use C++ casts (static_cast, etc.) instead of C-style casts",
                                line_content=line_content, column=node.start_point[1]))
 
-    # global.memory.no_malloc: no malloc/calloc/realloc/free
-    if cfg.is_enabled("global.memory.no_malloc"):
+    # global.memory.no_malloc + c.std_functions: combined pass over call_expression
+    _check_malloc = cfg.is_enabled("global.memory.no_malloc")
+    _check_std = cfg.is_enabled("c.std_functions")
+    if _check_malloc or _check_std:
         for node in nodes.get('call_expression'):
             func_node = node.children[0] if node.children else None
-            if func_node and func_node.type == 'identifier':
-                fname = text(func_node, content_bytes)
-                if fname in _MALLOC_FUNCS:
-                    line_num = node.start_point[0] + 1
-                    line_content = line_at(lines, node.start_point[0])
-                    v.append(Violation(path, line_num, "global.memory.no_malloc",
-                                       f"Don't use {fname}(), use new/delete or smart pointers",
-                                       line_content=line_content, column=node.start_point[1]))
-        # Also catch free() which may not be a call_expression if used as free(ptr)
-        # Already handled above since free(ptr) is a call_expression
+            if not func_node or func_node.type != 'identifier':
+                continue
+            fname = text(func_node, content_bytes)
+            line_num = node.start_point[0] + 1
+            lc = line_at(lines, node.start_point[0])
+            col = node.start_point[1]
+            if _check_malloc and fname in _MALLOC_FUNCS:
+                v.append(Violation(path, line_num, "global.memory.no_malloc",
+                                   f"Don't use {fname}(), use new/delete or smart pointers",
+                                   line_content=lc, column=col))
+            elif _check_std and fname in _C_FUNCTIONS and fname not in _MALLOC_FUNCS:
+                v.append(Violation(path, line_num, "c.std_functions",
+                                   f"Use std::{fname} instead of {fname}",
+                                   line_content=lc, column=col))
 
     # global.nullptr: use nullptr, not NULL
     if cfg.is_enabled("global.nullptr"):
         for node in nodes.get('null'):
-            node_text = text(node, content_bytes)
-            if node_text == 'NULL':
-                line_num = node.start_point[0] + 1
-                line_content = line_at(lines, node.start_point[0])
-                v.append(Violation(path, line_num, "global.nullptr",
+            if text(node, content_bytes) == 'NULL':
+                v.append(Violation(path, node.start_point[0] + 1, "global.nullptr",
                                    "Use nullptr instead of NULL",
-                                   line_content=line_content, column=node.start_point[1]))
+                                   line_content=line_at(lines, node.start_point[0]),
+                                   column=node.start_point[1]))
 
     # c.extern: no extern "C"
     if cfg.is_enabled("c.extern"):
         for node in nodes.get('linkage_specification'):
-            line_num = node.start_point[0] + 1
-            line_content = line_at(lines, node.start_point[0])
-            v.append(Violation(path, line_num, "c.extern",
+            v.append(Violation(path, node.start_point[0] + 1, "c.extern",
                                'No extern "C" in C++ code',
-                               line_content=line_content, column=node.start_point[1]))
+                               line_content=line_at(lines, node.start_point[0]),
+                               column=node.start_point[1]))
 
     # c.headers: no C headers
     if cfg.is_enabled("c.headers"):
@@ -198,25 +234,9 @@ def check_cxx_globals(path: str, lines: list[str], content_bytes: bytes,
                 if child.type == 'system_lib_string':
                     header = text(child, content_bytes).strip('<>')
                     if header in _C_HEADERS:
-                        line_num = inc.start_point[0] + 1
-                        cxx_header = 'c' + header.replace('.h', '')
-                        line_content = line_at(lines, inc.start_point[0])
-                        v.append(Violation(path, line_num, "c.headers",
-                                           f"Use <{cxx_header}> instead of <{header}>",
-                                           line_content=line_content))
-
-    # c.std_functions: use std:: equivalents
-    if cfg.is_enabled("c.std_functions"):
-        for node in nodes.get('call_expression'):
-            func_node = node.children[0] if node.children else None
-            if func_node and func_node.type == 'identifier':
-                fname = text(func_node, content_bytes)
-                if fname in _C_FUNCTIONS and fname not in _MALLOC_FUNCS:
-                    line_num = node.start_point[0] + 1
-                    line_content = line_at(lines, node.start_point[0])
-                    v.append(Violation(path, line_num, "c.std_functions",
-                                       f"Use std::{fname} instead of {fname}",
-                                       line_content=line_content, column=node.start_point[1]))
+                        v.append(Violation(path, inc.start_point[0] + 1, "c.headers",
+                                           f"Use <c{header.replace('.h', '')}> instead of <{header}>",
+                                           line_content=line_at(lines, inc.start_point[0])))
 
     return v
 
@@ -226,7 +246,6 @@ def check_cxx_naming(path: str, lines: list[str], content_bytes: bytes,
     """Check CXX naming rules: class/struct names (CamelCase), namespace (lowercase + closing comment)."""
     v = []
 
-    # naming.class: CamelCase class/struct names
     if cfg.is_enabled("naming.class"):
         for node in nodes.get('class_specifier', 'struct_specifier'):
             for child in node.children:
@@ -240,35 +259,26 @@ def check_cxx_naming(path: str, lines: list[str], content_bytes: bytes,
                                            line_content=line_content, column=child.start_point[1]))
                     break
 
-    # naming.namespace: lowercase namespaces + closing comment
     if cfg.is_enabled("naming.namespace"):
         for node in nodes.get('namespace_definition'):
+            ns_name = None
             for child in node.children:
                 if child.type == 'namespace_identifier':
-                    name = text(child, content_bytes)
-                    if not _LOWER_NS.match(name):
-                        line_num = child.start_point[0] + 1
-                        line_content = line_at(lines, child.start_point[0])
-                        v.append(Violation(path, line_num, "naming.namespace",
-                                           f"Namespace '{name}' should be lowercase",
-                                           line_content=line_content, column=child.start_point[1]))
+                    ns_name = text(child, content_bytes)
+                    if not _LOWER_NS.match(ns_name):
+                        v.append(Violation(path, child.start_point[0] + 1, "naming.namespace",
+                                           f"Namespace '{ns_name}' should be lowercase",
+                                           line_content=line_at(lines, child.start_point[0]),
+                                           column=child.start_point[1]))
+                    break
 
-            # Check closing comment: } // namespace <name>
             end_line = node.end_point[0]
-            if end_line < len(lines):
+            if ns_name and end_line < len(lines):
                 closing = lines[end_line].strip()
-                ns_name = None
-                for child in node.children:
-                    if child.type == 'namespace_identifier':
-                        ns_name = text(child, content_bytes)
-                        break
-                if ns_name and closing.startswith('}'):
-                    expected = f'// namespace {ns_name}'
-                    if expected not in closing:
-                        v.append(Violation(path, end_line + 1, "naming.namespace",
-                                           f"Closing brace should have comment '// namespace {ns_name}'",
-                                           Severity.MINOR,
-                                           line_content=lines[end_line]))
+                if closing.startswith('}') and f'// namespace {ns_name}' not in closing:
+                    v.append(Violation(path, end_line + 1, "naming.namespace",
+                                       f"Closing brace should have comment '// namespace {ns_name}'",
+                                       Severity.MINOR, line_content=lines[end_line]))
 
     return v
 
@@ -296,19 +306,14 @@ def _check_ref_pointer_placement(path: str, lines: list[str], content_bytes: byt
                                  nodes: NodeCache, cfg: Config) -> list[Violation]:
     """Check that & and * are next to type, not variable name."""
     v = []
-    # Use regex on lines for this - AST doesn't capture whitespace well
-    # Pattern: type <space(s)> &varname or type <space(s)> *varname
-    ref_pattern = re.compile(r'(\w)\s+&(\w)')
-    ptr_pattern = re.compile(r'(\w)\s+\*(\w)')
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
-        # Skip preprocessor, comments, string literals in a basic way
         if s.startswith(('#', '//', '/*', '*')):
             continue
 
         if cfg.is_enabled("decl.ref"):
-            for m in ref_pattern.finditer(line):
+            for m in _REF_PATTERN.finditer(line):
                 # Avoid matching && (logical and) or &= etc.
                 pos = m.start(0)
                 # Check it's not inside a string or preceded by another &
@@ -322,7 +327,7 @@ def _check_ref_pointer_placement(path: str, lines: list[str], content_bytes: byt
                                        line_content=line, column=amp_pos))
 
         if cfg.is_enabled("decl.point"):
-            for m in ptr_pattern.finditer(line):
+            for m in _PTR_PATTERN.finditer(line):
                 pos = m.start(0)
                 star_pos = line.index('*', pos)
                 # Skip if inside a comment or multiplication
@@ -334,33 +339,30 @@ def _check_ref_pointer_placement(path: str, lines: list[str], content_bytes: byt
     return v
 
 
+_TYPE_KEYWORDS = frozenset({
+    'int', 'char', 'float', 'double', 'long', 'short', 'unsigned',
+    'signed', 'void', 'bool', 'auto', 'const', 'static', 'volatile',
+    'extern', 'virtual', 'inline', 'explicit', 'mutable',
+})
+
+
 def _is_declaration_context(line: str) -> bool:
     """Heuristic: check if a line looks like a declaration (has a type)."""
-    s = line.strip()
-    # Common type keywords that suggest declaration context
-    type_keywords = {'int', 'char', 'float', 'double', 'long', 'short', 'unsigned',
-                     'signed', 'void', 'bool', 'auto', 'const', 'static', 'volatile',
-                     'extern', 'virtual', 'inline', 'explicit', 'mutable'}
-    words = s.split()
+    words = line.split()
     if not words:
         return False
-    # Function parameters or variable declarations
-    if any(w in type_keywords for w in words[:3]):
+    first = words[0]
+    if any(w in _TYPE_KEYWORDS for w in words[:3]):
         return True
-    # CamelCase type name (class type)
-    if words[0][0].isupper() and words[0].isalpha():
+    if first[0].isupper() and first.isalpha():
         return True
-    # std:: prefixed type
-    if words[0].startswith('std::'):
-        return True
-    return False
+    return first.startswith('std::')
 
 
 def _check_explicit_ctors(path: str, lines: list[str], content_bytes: bytes,
                           nodes: NodeCache) -> list[Violation]:
     """Check that single-argument constructors are marked explicit."""
     v = []
-
     for cls in nodes.get('class_specifier', 'struct_specifier'):
         class_name = None
         for child in cls.children:
@@ -370,14 +372,12 @@ def _check_explicit_ctors(path: str, lines: list[str], content_bytes: bytes,
         if not class_name:
             continue
 
-        # Look at field declarations / declarations inside the class
         for child in cls.children:
             if child.type != 'field_declaration_list':
                 continue
             for decl in child.children:
-                if decl.type not in ('declaration', 'field_declaration', 'function_definition'):
+                if decl.type not in _DECL_TYPES:
                     continue
-                # Check if this is a constructor
                 func_decl = None
                 is_explicit = False
                 for c in decl.children:
@@ -385,31 +385,42 @@ def _check_explicit_ctors(path: str, lines: list[str], content_bytes: bytes,
                         func_decl = c
                     elif c.type == 'explicit_function_specifier':
                         is_explicit = True
-
-                if not func_decl:
+                if not func_decl or is_explicit:
+                    continue
+                if find_id(func_decl, content_bytes) != class_name:
                     continue
 
-                # Check the function name matches class name (constructor)
-                func_name = find_id(func_decl, content_bytes)
-                if func_name != class_name:
-                    continue
-
-                # Count parameters
                 params = []
                 for c in func_decl.children:
                     if c.type == 'parameter_list':
                         params = [p for p in c.children if p.type == 'parameter_declaration']
+                if len(params) != 1:
+                    continue
 
-                # Single-arg constructors need explicit (unless already explicit)
-                if len(params) == 1 and not is_explicit:
-                    line_num = decl.start_point[0] + 1
-                    line_content = line_at(lines, decl.start_point[0])
-                    v.append(Violation(path, line_num, "decl.ctor.explicit",
-                                       f"Single-argument constructor '{class_name}' should be explicit",
-                                       Severity.MINOR,
-                                       line_content=line_content))
+                # Skip copy/move constructors
+                param = params[0]
+                has_ref = any(c.type == 'reference_declarator' for c in param.children)
+                if has_ref and _param_has_type(param, class_name, content_bytes):
+                    continue
+
+                v.append(Violation(path, decl.start_point[0] + 1, "decl.ctor.explicit",
+                                   f"Single-argument constructor '{class_name}' should be explicit",
+                                   Severity.MINOR,
+                                   line_content=line_at(lines, decl.start_point[0])))
 
     return v
+
+
+def _param_has_type(param, class_name: str, content_bytes: bytes) -> bool:
+    """Check if a parameter references the given class type (for copy/move detection)."""
+    for c in param.children:
+        if c.type == 'type_identifier' and text(c, content_bytes) == class_name:
+            return True
+        if c.type == 'template_type':
+            if any(gc.type == 'type_identifier' and text(gc, content_bytes) == class_name
+                   for gc in c.children):
+                return True
+    return False
 
 
 def check_cxx_control(path: str, lines: list[str], content_bytes: bytes,
@@ -421,11 +432,20 @@ def check_cxx_control(path: str, lines: list[str], content_bytes: bytes,
     if cfg.is_enabled("ctrl.switch"):
         for sw in nodes.get('switch_statement'):
             has_default = False
-            for child in find_nodes(sw, 'case_statement'):
-                case_text = text(child.children[0], content_bytes) if child.children else ''
-                if case_text == 'default':
-                    has_default = True
+            # Only check direct case_statement children of the switch's body,
+            # not recursing into nested switches.
+            body = None
+            for child in sw.children:
+                if child.type == 'compound_statement':
+                    body = child
                     break
+            if body:
+                for child in body.children:
+                    if child.type == 'case_statement':
+                        case_text = text(child.children[0], content_bytes) if child.children else ''
+                        if case_text == 'default':
+                            has_default = True
+                            break
             if not has_default:
                 line_num = sw.start_point[0] + 1
                 line_content = line_at(lines, sw.start_point[0])
@@ -441,14 +461,14 @@ def check_cxx_control(path: str, lines: list[str], content_bytes: bytes,
                 if child.type == ':':
                     col = child.start_point[1]
                     line_idx = child.start_point[0]
-                    if line_idx < len(lines) and col > 0 and lines[line_idx][col - 1] == ' ':
+                    if line_idx < len(lines) and col > 0 and lines[line_idx][col - 1].isspace():
                         v.append(Violation(path, line_idx + 1, "ctrl.switch.padding",
                                            "No space before colon in case/default label",
                                            line_content=lines[line_idx], column=col))
                     break
 
     # ctrl.empty: empty loop bodies should use continue (shared helper)
-    v.extend(check_ctrl_empty(path, lines, cfg))
+    v.extend(check_ctrl_empty(path, lines, cfg, nodes=nodes))
 
     return v
 
@@ -458,27 +478,34 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
     """Check CXX writing rules: braces, throw, operators, enum class, etc."""
     v = []
 
-    # braces.empty: {} on same line for empty bodies
     if cfg.is_enabled("braces.empty"):
         v.extend(_check_empty_braces(path, lines, content_bytes, nodes))
 
-    # braces.single_exp: prefer braces for single-expression blocks
     if cfg.is_enabled("braces.single_exp"):
         v.extend(_check_single_exp_braces(path, lines, content_bytes, nodes))
 
-    # err.throw: don't throw literals
-    if cfg.is_enabled("err.throw"):
+    # err.throw + err.throw.paren: combined pass
+    _check_throw = cfg.is_enabled("err.throw")
+    _check_throw_paren = cfg.is_enabled("err.throw.paren")
+    if _check_throw or _check_throw_paren:
         for node in nodes.get('throw_statement'):
+            line_num = node.start_point[0] + 1
+            line_content = line_at(lines, node.start_point[0])
+            col = node.start_point[1]
             for child in node.children:
-                if child.type in ('number_literal', 'string_literal', 'char_literal',
-                                  'true', 'false', 'null', 'nullptr'):
-                    line_num = node.start_point[0] + 1
-                    line_content = line_at(lines, node.start_point[0])
+                if _check_throw and child.type in _LITERAL_TYPES:
                     v.append(Violation(path, line_num, "err.throw",
                                        "Don't throw literals, throw exception objects",
-                                       line_content=line_content, column=node.start_point[1]))
+                                       line_content=line_content, column=col))
+                elif _check_throw and child.type == 'new_expression':
+                    v.append(Violation(path, line_num, "err.throw",
+                                       "Don't throw with new, throw by value",
+                                       line_content=line_content, column=col))
+                elif _check_throw_paren and child.type == 'parenthesized_expression':
+                    v.append(Violation(path, line_num, "err.throw.paren",
+                                       "No parentheses after throw",
+                                       line_content=line_content, column=col))
 
-    # err.throw.catch: catch by reference
     if cfg.is_enabled("err.throw.catch"):
         for node in nodes.get('catch_clause'):
             for child in node.children:
@@ -487,65 +514,50 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
                         if param.type == 'parameter_declaration':
                             param_text = text(param, content_bytes)
                             if '&' not in param_text and param_text != '...':
-                                line_num = param.start_point[0] + 1
-                                line_content = line_at(lines, param.start_point[0])
-                                v.append(Violation(path, line_num, "err.throw.catch",
+                                v.append(Violation(path, param.start_point[0] + 1,
+                                                   "err.throw.catch",
                                                    "Catch exceptions by reference",
                                                    Severity.MINOR,
-                                                   line_content=line_content))
+                                                   line_content=line_at(lines, param.start_point[0])))
 
-    # err.throw.paren: no parentheses after throw
-    if cfg.is_enabled("err.throw.paren"):
-        for node in nodes.get('throw_statement'):
-            for child in node.children:
-                if child.type == 'parenthesized_expression':
-                    line_num = node.start_point[0] + 1
-                    line_content = line_at(lines, node.start_point[0])
-                    v.append(Violation(path, line_num, "err.throw.paren",
-                                       "No parentheses after throw",
-                                       line_content=line_content, column=node.start_point[1]))
-
-    # exp.padding: no space in operator keyword (operator++ not operator ++)
     if cfg.is_enabled("exp.padding"):
         v.extend(_check_operator_padding(path, lines, content_bytes, nodes))
 
-    # exp.linebreak: line breaks before binary operators
     if cfg.is_enabled("exp.linebreak"):
         v.extend(_check_linebreak_operators(path, lines, root=nodes.root))
 
-    # fun.proto.void.cxx: MUST NOT use void in C++ empty params
     if cfg.is_enabled("fun.proto.void.cxx"):
         v.extend(_check_no_void_params(path, lines, content_bytes, nodes))
 
-    # fun.length: max 50 lines per function (CXX uses 50)
     if cfg.is_enabled("fun.length"):
+        max_lines = cfg.max_lines
         for func in nodes.get('function_definition'):
-            body = None
-            for child in func.children:
-                if child.type == 'compound_statement':
-                    body = child
+            body = next((c for c in func.children if c.type == 'compound_statement'), None)
             if body:
                 count = count_function_lines(body, lines)
-                if count > cfg.max_lines:
-                    line_num = func.start_point[0] + 1
-                    v.append(Violation(path, line_num, "fun.length",
-                                       f"Function has {count} lines (max {cfg.max_lines})",
+                if count > max_lines:
+                    v.append(Violation(path, func.start_point[0] + 1, "fun.length",
+                                       f"Function has {count} lines (max {max_lines})",
                                        line_content=line_at(lines, func.start_point[0])))
 
-    # op.assign: assignment operators should return Class& and *this
     if cfg.is_enabled("op.assign"):
         v.extend(_check_op_assign(path, lines, content_bytes, nodes))
 
-    # op.overload: don't overload operator,, operator||, operator&&
-    if cfg.is_enabled("op.overload"):
-        v.extend(_check_forbidden_overloads(path, lines, content_bytes, nodes, _FORBIDDEN_OPS, "op.overload"))
+    # op.overload + op.overload.binand
+    _check_overload = cfg.is_enabled("op.overload")
+    _check_binand = cfg.is_enabled("op.overload.binand")
+    if _check_overload or _check_binand:
+        for node in nodes.get('operator_name'):
+            op = text(node, content_bytes).replace(' ', '')
+            line_num = node.start_point[0] + 1
+            lc = line_at(lines, node.start_point[0])
+            if _check_overload and op in _FORBIDDEN_OPS:
+                v.append(Violation(path, line_num, "op.overload",
+                                   f"Don't overload {op}", line_content=lc))
+            elif _check_binand and op == "operator&":
+                v.append(Violation(path, line_num, "op.overload.binand",
+                                   f"Don't overload {op}", Severity.MINOR, line_content=lc))
 
-    # op.overload.binand: don't overload operator&
-    if cfg.is_enabled("op.overload.binand"):
-        v.extend(_check_forbidden_overloads(path, lines, content_bytes, nodes, {"operator&"}, "op.overload.binand",
-                                            severity=Severity.MINOR))
-
-    # enum.class: prefer enum class over plain enum
     if cfg.is_enabled("enum.class"):
         for node in nodes.get('enum_specifier'):
             has_class = any(child.type == 'class' for child in node.children)
@@ -562,19 +574,28 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
 
 def _check_empty_braces(path: str, lines: list[str], content_bytes: bytes,
                         nodes: NodeCache) -> list[Violation]:
-    """Check that empty bodies use {} on the same line."""
+    """Check that empty bodies use {} on the same line (no space inside)."""
     v = []
     for node in nodes.get('compound_statement'):
         # Empty body: only { and } children, no statements
         real_children = [c for c in node.children if c.type not in ('{', '}', 'comment')]
         if not real_children:
-            # Check if { and } are on different lines
             if node.start_point[0] != node.end_point[0]:
+                # Multi-line empty body
                 line_num = node.start_point[0] + 1
                 line_content = line_at(lines, node.start_point[0])
                 v.append(Violation(path, line_num, "braces.empty",
                                    "Empty body should use {} on the same line",
                                    line_content=line_content))
+            else:
+                # Same line — must be exactly `{}`, not `{ }` or `{ /* comment */ }`
+                body_text = text(node, content_bytes)
+                if body_text != '{}':
+                    line_num = node.start_point[0] + 1
+                    line_content = line_at(lines, node.start_point[0])
+                    v.append(Violation(path, line_num, "braces.empty",
+                                       "Empty body should be {} with no space",
+                                       line_content=line_content))
     return v
 
 
@@ -582,21 +603,31 @@ def _check_single_exp_braces(path: str, lines: list[str], content_bytes: bytes,
                              nodes: NodeCache) -> list[Violation]:
     """Check that single-expression blocks have braces."""
     v = []
-    for node in nodes.get('if_statement', 'while_statement', 'for_statement'):
-        # Find the body (last significant child)
+    for node in nodes.get('if_statement', 'while_statement', 'for_statement', 'do_statement'):
         body = None
         for child in node.children:
-            if child.type in ('expression_statement', 'return_statement', 'break_statement',
-                              'continue_statement', 'throw_statement'):
+            if child.type in _STMT_TYPES:
                 body = child
 
-        if body and body.type != 'compound_statement':
+        if body:
             line_num = body.start_point[0] + 1
             line_content = line_at(lines, body.start_point[0])
             v.append(Violation(path, line_num, "braces.single_exp",
                                "Single-expression block should have braces",
                                Severity.MINOR,
                                line_content=line_content))
+
+    # else clauses: skip `else if` (child is if_statement, not a bare statement)
+    for node in nodes.get('else_clause'):
+        for child in node.children:
+            if child.type in _STMT_TYPES:
+                line_num = child.start_point[0] + 1
+                line_content = line_at(lines, child.start_point[0])
+                v.append(Violation(path, line_num, "braces.single_exp",
+                                   "Single-expression block should have braces",
+                                   Severity.MINOR,
+                                   line_content=line_content))
+
     return v
 
 
@@ -617,78 +648,57 @@ def _check_operator_padding(path: str, lines: list[str],
     return v
 
 
+_TEMPLATE_TYPES = frozenset(('template_parameter_list', 'template_argument_list'))
+_REF_TYPES = frozenset(('reference_declarator', 'abstract_reference_declarator', 'type_descriptor'))
+_PTR_TYPES = frozenset(('pointer_declarator', 'abstract_pointer_declarator'))
+
+
 def _collect_non_binary_op_lines(root) -> set[tuple[int, str]]:
-    """Use tree-sitter AST to find lines where >, >>, &, or * are NOT binary operators.
-
-    Returns a set of (0-based line number, operator string) pairs that should be
-    excluded from the binary operator line-break check.
-    """
+    """Find lines where >, >>, &, or * are NOT binary operators (AST-based)."""
     excluded = set()
-
-    def _walk(node):
-        # Template parameter lists: template<...> — the > is not a binary op
-        if node.type == 'template_parameter_list':
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        ntype = node.type
+        if ntype in _TEMPLATE_TYPES:
             end_line = node.end_point[0]
             excluded.add((end_line, '>'))
             excluded.add((end_line, '>>'))
-
-        # Template argument lists: vector<int> — the > is not a binary op
-        elif node.type == 'template_argument_list':
-            end_line = node.end_point[0]
-            excluded.add((end_line, '>'))
-            excluded.add((end_line, '>>'))
-
-        # Reference declarators: const int& x, auto f() -> const T&
-        elif node.type in ('reference_declarator', 'abstract_reference_declarator',
-                           'type_descriptor'):
+        elif ntype in _REF_TYPES:
             for child in node.children:
-                if child.type == '&' or child.type == '&&':
+                if child.type in ('&', '&&'):
                     excluded.add((child.start_point[0], child.type))
-
-        # Pointer declarators: int* p
-        elif node.type in ('pointer_declarator', 'abstract_pointer_declarator'):
+        elif ntype in _PTR_TYPES:
             for child in node.children:
                 if child.type == '*':
                     excluded.add((child.start_point[0], '*'))
-
-        # Trailing return type: auto f() -> const T&
-        elif node.type == 'trailing_return_type':
+        elif ntype == 'trailing_return_type':
             end_line = node.end_point[0]
-            # The & or * at end of a trailing return type is a type qualifier
-            excluded.add((end_line, '&'))
-            excluded.add((end_line, '*'))
-            excluded.add((end_line, '>'))
-            excluded.add((end_line, '>>'))
-
-        for child in node.children:
-            _walk(child)
-
-    _walk(root)
+            excluded.update(((end_line, '&'), (end_line, '*'),
+                             (end_line, '>'), (end_line, '>>')))
+        stack.extend(node.children)
     return excluded
+
+
+# Pre-sorted by length (longest first) for greedy matching
+_BIN_OPS = ('&&', '||', '<<', '>>', '==', '!=', '<=', '>=',
+            '+', '-', '*', '/', '%', '&', '|', '^', '<', '>')
 
 
 def _check_linebreak_operators(path: str, lines: list[str],
                                root=None) -> list[Violation]:
     """Check that line breaks come before binary operators, not after."""
     v = []
-    # Binary operators that should not start a continuation line
-    bin_ops = {'&&', '||', '+', '-', '*', '/', '%', '&', '|', '^', '<<', '>>',
-               '==', '!=', '<', '>', '<=', '>='}
-
-    # Use tree-sitter to find lines where ambiguous operators are NOT binary
     excluded = _collect_non_binary_op_lines(root) if root else set()
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
         if not s or s.startswith(('#', '//', '/*', '*')):
             continue
-        # Check if line ends with a binary operator (bad: break after operator)
-        for op in sorted(bin_ops, key=len, reverse=True):
+        for op in _BIN_OPS:
             if s.endswith(op) and not s.endswith(f'//{op}'):
-                # Verify it's not a unary or part of something else
                 before = s[:-len(op)].rstrip()
                 if before and not before.endswith(('(', ',', '=')):
-                    # Skip if tree-sitter says this is not a binary operator
                     if (i - 1, op) in excluded:
                         break
                     v.append(Violation(path, i, "exp.linebreak",
@@ -704,40 +714,21 @@ def _check_no_void_params(path: str, lines: list[str], content_bytes: bytes,
     """In C++, empty parameter lists should use () not (void)."""
     v = []
     seen = set()
-
-    def _check_unique(func_decl):
-        key = (func_decl.start_point, func_decl.end_point)
-        if key not in seen:
+    for node in nodes.get('function_definition', 'declaration', 'field_declaration'):
+        for fd in find_nodes(node, 'function_declarator'):
+            key = (fd.start_point, fd.end_point)
+            if key in seen:
+                continue
             seen.add(key)
-            _check_void_in_func_decl(path, lines, content_bytes, func_decl, v)
-
-    for func in nodes.get('function_definition'):
-        for fd in find_nodes(func, 'function_declarator'):
-            _check_unique(fd)
-
-    # Check declarations too (prototypes)
-    for decl in nodes.get('declaration', 'field_declaration'):
-        for fd in find_nodes(decl, 'function_declarator'):
-            _check_unique(fd)
-
+            for child in fd.children:
+                if child.type == 'parameter_list':
+                    params = [p for p in child.children if p.type == 'parameter_declaration']
+                    if len(params) == 1 and text(params[0], content_bytes).strip() == 'void':
+                        name = find_id(fd, content_bytes)
+                        v.append(Violation(path, fd.start_point[0] + 1, "fun.proto.void.cxx",
+                                           f"'{name or '?'}' should use () not (void) in C++",
+                                           line_content=line_at(lines, fd.start_point[0])))
     return v
-
-
-def _check_void_in_func_decl(path: str, lines: list[str], content_bytes: bytes,
-                             func_decl, v: list[Violation]):
-    """Check a single function_declarator for (void) params."""
-    for child in func_decl.children:
-        if child.type == 'parameter_list':
-            params = [p for p in child.children if p.type == 'parameter_declaration']
-            if len(params) == 1:
-                param_text = text(params[0], content_bytes).strip()
-                if param_text == 'void':
-                    line_num = func_decl.start_point[0] + 1
-                    name = find_id(func_decl, content_bytes)
-                    line_content = line_at(lines, func_decl.start_point[0])
-                    v.append(Violation(path, line_num, "fun.proto.void.cxx",
-                                       f"'{name or '?'}' should use () not (void) in C++",
-                                       line_content=line_content))
 
 
 def _check_op_assign(path: str, lines: list[str], content_bytes: bytes,
@@ -745,55 +736,22 @@ def _check_op_assign(path: str, lines: list[str], content_bytes: bytes,
     """Check that assignment operators return Class& and *this."""
     v = []
     for func in nodes.get('function_definition'):
-        op_names = [text(n, content_bytes) for n in find_nodes(func, 'operator_name')]
-        if 'operator=' not in op_names:
+        if not any(text(n, content_bytes) == 'operator=' for n in find_nodes(func, 'operator_name')):
             continue
 
-        # Check return type includes & (reference)
-        has_ref_return = False
-        for child in func.children:
-            if child.type == 'reference_declarator':
-                has_ref_return = True
-                break
+        line_num = func.start_point[0] + 1
+        lc = line_at(lines, func.start_point[0])
 
-        if not has_ref_return:
-            line_num = func.start_point[0] + 1
-            line_content = line_at(lines, func.start_point[0])
+        if not any(c.type == 'reference_declarator' for c in func.children):
             v.append(Violation(path, line_num, "op.assign",
-                               "Assignment operator should return Class&",
-                               line_content=line_content))
+                               "Assignment operator should return Class&", line_content=lc))
             continue
 
-        # Check body contains "return *this"
-        body = None
-        for child in func.children:
-            if child.type == 'compound_statement':
-                body = child
-                break
-        if body:
-            body_text = text(body, content_bytes)
-            if 'return *this' not in body_text and 'return *this;' not in body_text:
-                line_num = func.start_point[0] + 1
-                line_content = line_at(lines, func.start_point[0])
-                v.append(Violation(path, line_num, "op.assign",
-                                   "Assignment operator should return *this",
-                                   line_content=line_content))
+        body = next((c for c in func.children if c.type == 'compound_statement'), None)
+        if body and 'return *this' not in text(body, content_bytes):
+            v.append(Violation(path, line_num, "op.assign",
+                               "Assignment operator should return *this", line_content=lc))
 
     return v
 
 
-def _check_forbidden_overloads(path: str, lines: list[str], content_bytes: bytes,
-                               nodes: NodeCache, forbidden: set[str], rule: str,
-                               severity: Severity = Severity.MAJOR) -> list[Violation]:
-    """Check for forbidden operator overloads."""
-    v = []
-    for node in nodes.get('operator_name'):
-        op = text(node, content_bytes).replace(' ', '')
-        if op in forbidden:
-            line_num = node.start_point[0] + 1
-            line_content = line_at(lines, node.start_point[0])
-            v.append(Violation(path, line_num, rule,
-                               f"Don't overload {op}",
-                               severity,
-                               line_content=line_content))
-    return v
