@@ -18,6 +18,32 @@ _DIGRAPHS = ('??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%'
 _ASM_KEYWORDS = ('asm(', '__asm__', '__asm')
 
 
+def _strip_comments(line: str, in_block: bool) -> tuple[str, bool]:
+    """Strip comments from a line, returning (cleaned_line, still_in_block_comment).
+
+    Handles // line comments, /* ... */ block comments (including multi-line).
+    """
+    result = []
+    i = 0
+    while i < len(line):
+        if in_block:
+            if line[i:i+2] == '*/':
+                in_block = False
+                i += 2
+            else:
+                i += 1
+        else:
+            if line[i:i+2] == '//':
+                break  # rest of line is comment
+            elif line[i:i+2] == '/*':
+                in_block = True
+                i += 2
+            else:
+                result.append(line[i])
+                i += 1
+    return ''.join(result), in_block
+
+
 def check_file_format(path: str, content: str, lines: list[str], cfg: Config) -> list[Violation]:
     """Check file formatting rules."""
     v = []
@@ -254,6 +280,7 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
     if not (check_mark or check_if or check_digraphs):
         return v
 
+    in_block_comment = False
     for i, line in enumerate(lines, 1):
         s = line.strip()
 
@@ -268,8 +295,9 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
                               line_content=line))
 
         if check_digraphs:
+            code_only, in_block_comment = _strip_comments(line, in_block_comment)
             for d in _DIGRAPHS:
-                if d in line:
+                if d in code_only:
                     v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
                                       line_content=line, column=line.find(d)))
 

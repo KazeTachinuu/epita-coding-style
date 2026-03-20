@@ -75,6 +75,15 @@ def test_cpp_mark(check, code, should_fail):
 @pytest.mark.parametrize("code,should_fail", [
     ("int arr[10];\n", False),
     ("int arr<:10:>;\n", True),
-], ids=["brackets-ok", "digraph-fail"])
+    ("// outb(COM1 + 0, ???);\n", False),
+    ("/* trigraph ??? in block comment */\n", False),
+    ("int x; // comment with <:\n", False),
+    ("int x; /* ??? */ int y;\n", False),
+    ("/* start\n??? still comment\n*/ int ok;\n", False),
+    ("int x <:0:>; // comment\n", True),
+], ids=["brackets-ok", "digraph-fail", "trigraph-in-line-comment",
+        "trigraph-in-block-comment", "digraph-in-line-comment",
+        "trigraph-in-inline-block-comment", "trigraph-in-multiline-block-comment",
+        "digraph-in-code-with-comment"])
 def test_cpp_digraphs(check, code, should_fail):
     assert check(code, "cpp.digraphs") == should_fail
