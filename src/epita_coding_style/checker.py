@@ -55,7 +55,7 @@ def _check_c_file(path: str, cfg: Config, content: str, lines: list[str],
         check_braces(path, lines, cfg) +
         check_functions(path, nodes, content_bytes, lines, cfg) +
         check_exports(path, nodes, content_bytes, cfg) +
-        check_preprocessor(path, lines, cfg) +
+        check_preprocessor(path, lines, cfg, nodes=nodes, content_bytes=content_bytes) +
         check_misc(path, nodes, content_bytes, lines, cfg) +
         check_vla(path, nodes, content_bytes, lines, cfg) +
         check_ctrl_empty(path, lines, cfg, nodes=nodes) +

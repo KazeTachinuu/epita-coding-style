@@ -18,30 +18,19 @@ _DIGRAPHS = ('??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%'
 _ASM_KEYWORDS = ('asm(', '__asm__', '__asm')
 
 
-def _strip_comments(line: str, in_block: bool) -> tuple[str, bool]:
-    """Strip comments from a line, returning (cleaned_line, still_in_block_comment).
+def _comment_ranges(nodes: NodeCache) -> list[tuple[int, int]]:
+    """Return byte ranges of all comment nodes in the AST."""
+    return [(n.start_byte, n.end_byte) for n in nodes.get("comment")]
 
-    Handles // line comments, /* ... */ block comments (including multi-line).
-    """
-    result = []
-    i = 0
-    while i < len(line):
-        if in_block:
-            if line[i:i+2] == '*/':
-                in_block = False
-                i += 2
-            else:
-                i += 1
-        else:
-            if line[i:i+2] == '//':
-                break  # rest of line is comment
-            elif line[i:i+2] == '/*':
-                in_block = True
-                i += 2
-            else:
-                result.append(line[i])
-                i += 1
-    return ''.join(result), in_block
+
+def _in_comment(pos: int, ranges: list[tuple[int, int]]) -> bool:
+    """Check if a byte position falls inside a comment."""
+    for start, end in ranges:
+        if start <= pos < end:
+            return True
+        if start > pos:
+            break
+    return False
 
 
 def check_file_format(path: str, content: str, lines: list[str], cfg: Config) -> list[Violation]:
@@ -264,7 +253,9 @@ def check_exports(path: str, nodes: NodeCache, content: bytes, cfg: Config) -> l
     return v
 
 
-def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violation]:
+def check_preprocessor(path: str, lines: list[str], cfg: Config,
+                       nodes: NodeCache | None = None,
+                       content_bytes: bytes | None = None) -> list[Violation]:
     """Check preprocessor rules."""
     v = []
 
@@ -280,7 +271,16 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
     if not (check_mark or check_if or check_digraphs):
         return v
 
-    in_block_comment = False
+    comments = _comment_ranges(nodes) if (check_digraphs and nodes) else []
+
+    # Build line start offsets for mapping line numbers to byte positions
+    line_offsets = []
+    if check_digraphs and content_bytes is not None:
+        offset = 0
+        for line in lines:
+            line_offsets.append(offset)
+            offset += len(line) + 1  # +1 for newline
+
     for i, line in enumerate(lines, 1):
         s = line.strip()
 
@@ -295,11 +295,19 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config) -> list[Violati
                               line_content=line))
 
         if check_digraphs:
-            code_only, in_block_comment = _strip_comments(line, in_block_comment)
             for d in _DIGRAPHS:
-                if d in code_only:
-                    v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
-                                      line_content=line, column=line.find(d)))
+                col = line.find(d)
+                while col != -1:
+                    if line_offsets:
+                        byte_pos = line_offsets[i - 1] + col
+                        if not _in_comment(byte_pos, comments):
+                            v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
+                                              line_content=line, column=col))
+                    else:
+                        # No AST available, fall back to flagging all
+                        v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
+                                          line_content=line, column=col))
+                    col = line.find(d, col + 1)
 
     return v
 
