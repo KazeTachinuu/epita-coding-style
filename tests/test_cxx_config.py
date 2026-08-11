@@ -206,7 +206,6 @@ def test_config_string_limit_errors(tmp_path, monkeypatch):
 
 
 def test_config_missing_explicit_path_errors(tmp_path):
-    from pathlib import Path
     from epita_coding_style import load_config
     from epita_coding_style.config import ConfigError
     with pytest.raises(ConfigError, match="not found"):

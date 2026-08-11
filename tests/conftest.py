@@ -1,7 +1,7 @@
 """Pytest fixtures for coding style checker tests."""
 
 import pytest
-from epita_coding_style import check_file, Violation, Severity, Config, load_config
+from epita_coding_style import check_file, Violation, Config, load_config
 
 
 @pytest.fixture(autouse=True)

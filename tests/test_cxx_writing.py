@@ -464,3 +464,11 @@ def test_fun_length_runs_on_cxx(check_cxx):
         "binand-assign-ok", "binand-not-logical-and", "enum-struct-ok", "anonymous-enum"])
 def test_cxx_writing_edges(check_cxx, code, rule, should_fail):
     assert check_cxx(code, rule) == should_fail
+
+
+@pytest.mark.parametrize("code,rule,should_fail", [
+    ("int f(int y)\n{\n    int x = y; // sum +\n    return x;\n}\n", "exp.linebreak", False),
+    ("void f(int b)\n{\n    int x = 0; // a &b\n    x = b;\n}\n", "decl.ref", False),
+], ids=["op-in-trailing-comment", "ref-in-trailing-comment"])
+def test_comment_blindness_edges(check_cxx, code, rule, should_fail):
+    assert check_cxx(code, rule) == should_fail

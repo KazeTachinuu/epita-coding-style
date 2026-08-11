@@ -1,6 +1,5 @@
 """Tests for line content and column display in violations."""
 
-import pytest
 
 
 def test_decl_single_line_content(check_result):

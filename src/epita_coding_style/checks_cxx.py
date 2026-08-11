@@ -308,8 +308,9 @@ def _check_ref_pointer_placement(path: str, lines: list[str],
     v = []
 
     for i, line in enumerate(lines, 1):
+        line = re.sub(r'//.*', '', line)
         s = line.strip()
-        if s.startswith(('#', '//', '/*', '*')) or not _is_declaration_context(line):
+        if s.startswith(('#', '/*', '*')) or not _is_declaration_context(line):
             continue
 
         if cfg.is_enabled("decl.ref"):
@@ -470,7 +471,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
         v.extend(_check_empty_braces(path, lines, content_bytes, nodes))
 
     if cfg.is_enabled("braces.single_exp"):
-        v.extend(_check_single_exp_braces(path, lines, content_bytes, nodes))
+        v.extend(_check_single_exp_braces(path, lines, nodes))
 
     # err.throw + err.throw.paren: combined pass
     _check_throw = cfg.is_enabled("err.throw")
@@ -576,7 +577,7 @@ def _check_empty_braces(path: str, lines: list[str], content_bytes: bytes,
     return v
 
 
-def _check_single_exp_braces(path: str, lines: list[str], content_bytes: bytes,
+def _check_single_exp_braces(path: str, lines: list[str],
                              nodes: NodeCache) -> list[Violation]:
     """Check that single-expression blocks have braces."""
     v = []
@@ -669,11 +670,11 @@ def _check_linebreak_operators(path: str, lines: list[str],
     excluded = _collect_non_binary_op_lines(root) if root else set()
 
     for i, line in enumerate(lines, 1):
-        s = line.strip()
-        if not s or s.startswith(('#', '//', '/*', '*')):
+        s = re.sub(r'//.*', '', line).strip()
+        if not s or s.startswith(('#', '/*', '*')):
             continue
         for op in _BIN_OPS:
-            if s.endswith(op) and not s.endswith(f'//{op}'):
+            if s.endswith(op):
                 before = s[:-len(op)].rstrip()
                 if before and not before.endswith(('(', ',', '=')):
                     if (i - 1, op) in excluded:

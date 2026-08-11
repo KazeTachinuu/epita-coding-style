@@ -117,3 +117,7 @@ def test_comment_multi_ignored_for_cxx(check_cxx):
 
 def test_cpp_guard_not_required_in_source(check):
     assert not check("int x;\n", "cpp.guard")
+
+
+def test_cpp_if_ignores_directive_inside_comment(check):
+    assert not check("/*\n** #endif\n*/\nint g;\n", "cpp.if")

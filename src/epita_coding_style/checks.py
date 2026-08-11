@@ -12,6 +12,7 @@ from .core import Violation, Severity, NodeCache, text, find_id, find_nodes, lin
 
 # Pre-compiled regex patterns
 _CHAR_LITERAL = re.compile(r"'(?:\\.|[^'\\])'")
+_STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\])*"')
 _INIT_ASSIGN = re.compile(r'(?<![!=<>])=(?!=)')
 _CLANG_ERROR = re.compile(r'^.*:(\d+):\d+: (?:error|warning):')
 _DIGRAPHS = ('??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%', '%>', '<:', ':>')
@@ -94,7 +95,8 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
         if not s or s.startswith(('#', '//')):
             continue
 
-        clean = _CHAR_LITERAL.sub("   ", s)
+        clean = _STRING_LITERAL.sub(lambda m: ' ' * len(m.group()),
+                                    _CHAR_LITERAL.sub("   ", s))
 
         if '{' in clean:
             pos = clean.find('{')
@@ -275,18 +277,20 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config,
     if not (check_mark or check_if or check_digraphs):
         return v
 
-    comments = _comment_ranges(nodes) if check_digraphs else []
+    comments = _comment_ranges(nodes)
 
     # Line start offsets map (line, col) to byte positions
     line_offsets = []
-    if check_digraphs:
-        offset = 0
-        for line in lines:
-            line_offsets.append(offset)
-            offset += len(line) + 1
+    offset = 0
+    for line in lines:
+        line_offsets.append(offset)
+        offset += len(line) + 1
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
+
+        if s.startswith('#') and _in_comment(line_offsets[i - 1] + line.find('#'), comments):
+            continue
 
         if check_mark and s.startswith('#') and line[0] != '#':
             v.append(Violation(path, i, "cpp.mark", "# must be on first column",
@@ -397,7 +401,7 @@ _CLANG_FORMAT_CANDIDATES = {
 }
 
 
-def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
+def check_misc(path: str, nodes: NodeCache, lines: list[str], cfg: Config) -> list[Violation]:
     """Check misc rules (declarations, control structures, goto, cast)."""
     v = []
 
