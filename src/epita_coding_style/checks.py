@@ -74,8 +74,8 @@ def check_braces(path: str, lines: list[str], cfg: Config) -> list[Violation]:
     """Check Allman brace style."""
     if not cfg.is_enabled("braces"):
         return []
-    # Skip if format check is enabled - clang-format handles braces
-    if cfg.is_enabled("format"):
+    # clang-format owns brace layout when available
+    if cfg.is_enabled("format") and shutil.which("clang-format"):
         return []
 
     v = []
@@ -254,8 +254,7 @@ def check_exports(path: str, nodes: NodeCache, content: bytes, cfg: Config) -> l
 
 
 def check_preprocessor(path: str, lines: list[str], cfg: Config,
-                       nodes: NodeCache | None = None,
-                       content_bytes: bytes | None = None) -> list[Violation]:
+                       nodes: NodeCache, content_bytes: bytes) -> list[Violation]:
     """Check preprocessor rules."""
     v = []
 
@@ -271,15 +270,14 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config,
     if not (check_mark or check_if or check_digraphs):
         return v
 
-    comments = _comment_ranges(nodes) if (check_digraphs and nodes) else []
+    comments = _comment_ranges(nodes) if check_digraphs else []
 
-    # Build line start offsets for mapping line numbers to byte positions
+    # Line start offsets map (line, col) to byte positions
     line_offsets = []
-    if check_digraphs and content_bytes is not None:
-        offset = 0
-        for line in lines:
-            line_offsets.append(offset)
-            offset += len(line) + 1  # +1 for newline
+    offset = 0
+    for line in lines:
+        line_offsets.append(offset)
+        offset += len(line) + 1
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
@@ -298,13 +296,7 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config,
             for d in _DIGRAPHS:
                 col = line.find(d)
                 while col != -1:
-                    if line_offsets:
-                        byte_pos = line_offsets[i - 1] + col
-                        if not _in_comment(byte_pos, comments):
-                            v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
-                                              line_content=line, column=col))
-                    else:
-                        # No AST available, fall back to flagging all
+                    if not _in_comment(line_offsets[i - 1] + col, comments):
                         v.append(Violation(path, i, "cpp.digraphs", f"Digraph '{d}' not allowed",
                                           line_content=line, column=col))
                     col = line.find(d, col + 1)
@@ -337,25 +329,18 @@ def check_vla(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg
 
 
 def check_ctrl_empty(path: str, lines: list[str], cfg: Config,
-                     nodes: NodeCache | None = None) -> list[Violation]:
+                     nodes: NodeCache) -> list[Violation]:
     """Check for empty loop bodies. Shared between C and C++."""
     if not cfg.is_enabled("ctrl.empty"):
         return []
     v = []
-    if nodes is not None:
-        for node in nodes.get('for_statement', 'while_statement'):
-            for child in node.children:
-                if child.type == 'expression_statement' \
-                        and all(c.type == ';' for c in child.children):
-                    v.append(Violation(path, child.start_point[0] + 1, "ctrl.empty",
-                                      "Use 'continue' for empty loops",
-                                      line_content=line_at(lines, child.start_point[0])))
-        return v
-    # Line-based fallback
-    for i, line in enumerate(lines, 1):
-        if line.strip() == ';' and i > 1 and lines[i - 2].strip().startswith(('for', 'while')):
-            v.append(Violation(path, i, "ctrl.empty", "Use 'continue' for empty loops",
-                              line_content=line))
+    for node in nodes.get('for_statement', 'while_statement'):
+        for child in node.children:
+            if child.type == 'expression_statement' \
+                    and all(c.type == ';' for c in child.children):
+                v.append(Violation(path, child.start_point[0] + 1, "ctrl.empty",
+                                  "Use 'continue' for empty loops",
+                                  line_content=line_at(lines, child.start_point[0])))
     return v
 
 
@@ -374,12 +359,6 @@ _CLANG_FORMAT_CANDIDATES = {
     Lang.C: (".clang-format-c", ".clang-format"),
     Lang.CXX: (".clang-format-cxx", ".clang-format"),
 }
-_CLANG_FORMAT_DEFAULT = (".clang-format",)
-
-
-def _clang_format_candidates(lang: Lang | None) -> tuple[str, ...]:
-    """Return ordered clang-format config filenames for a language."""
-    return _CLANG_FORMAT_CANDIDATES.get(lang, _CLANG_FORMAT_DEFAULT)
 
 
 def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cfg: Config) -> list[Violation]:
@@ -432,7 +411,7 @@ def _find_clang_format_config(start_path: str, lang: Lang | None = None) -> str 
     Looks for language-specific configs first (.clang-format-c / .clang-format-cxx),
     then falls back to the generic .clang-format.
     """
-    suffixes = _clang_format_candidates(lang)
+    suffixes = _CLANG_FORMAT_CANDIDATES.get(lang, (".clang-format",))
 
     path = os.path.abspath(start_path)
     if os.path.isfile(path):
@@ -462,7 +441,7 @@ def check_clang_format(path: str, cfg: Config) -> list[Violation]:
     if not config_file:
         # Fallback to bundled package configs
         pkg_dir = os.path.dirname(__file__)
-        for name in _clang_format_candidates(lang):
+        for name in _CLANG_FORMAT_CANDIDATES.get(lang, (".clang-format",)):
             pkg_config = os.path.join(pkg_dir, name)
             if os.path.isfile(pkg_config):
                 config_file = pkg_config
