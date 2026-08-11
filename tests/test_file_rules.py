@@ -43,3 +43,15 @@ def test_file_spurious(check, code, should_fail):
 ], ids=["single-blank", "double-blank"])
 def test_lines_empty(check, code, should_fail):
     assert check(code, "lines.empty") == should_fail
+
+
+@pytest.mark.parametrize("code,rule,should_fail", [
+    ("int a;\nint b;\r\n", "file.dos", True),
+    ("", "file.terminate", False),
+    ("int x;\n\n\n", "file.spurious", True),
+    ("  \nint x;\n", "file.spurious", True),
+    ("int a;\n \n\t\nint b;\n", "lines.empty", True),
+], ids=["dos-mixed", "terminate-empty-file", "spurious-multi-trailing",
+        "spurious-ws-first-line", "empty-whitespace-only"])
+def test_file_rule_edges(check, code, rule, should_fail):
+    assert check(code, rule) == should_fail

@@ -119,3 +119,7 @@ CONSTEXPR_LITERAL = "constexpr int x = 42;\nint main() { return 0; }\n"
 ], ids=["constexpr-ok", "const-should-be-constexpr"])
 def test_cpp_constexpr(check_cxx, code, should_fail):
     assert check_cxx(code, "cpp.constexpr") == should_fail
+
+
+def test_constexpr_runtime_init_not_flagged(check_cxx):
+    assert not check_cxx("int f();\nconst int x = f();\n", "cpp.constexpr")

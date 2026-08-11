@@ -537,7 +537,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
 
     if cfg.is_enabled("enum.class"):
         for node in nodes.get('enum_specifier'):
-            has_class = any(child.type == 'class' for child in node.children)
+            has_class = any(child.type in ('class', 'struct') for child in node.children)
             if not has_class:
                 line_num = node.start_point[0] + 1
                 line_content = line_at(lines, node.start_point[0])

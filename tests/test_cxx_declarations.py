@@ -120,3 +120,12 @@ FIXED_ARRAY = "void foo() { int arr[10]; }\n"
 ], ids=["fixed-array-ok", "vla-detected"])
 def test_decl_vla(check_cxx, code, should_fail):
     assert check_cxx(code, "decl.vla") == should_fail
+
+
+@pytest.mark.parametrize("code,rule,should_fail", [
+    ("void f(int a, int b)\n{\n    int c = a & b;\n}\n", "decl.ref", False),
+    ("class Foo\n{\npublic:\n    Foo(Foo&& o);\n};\n", "decl.ref", False),
+    ("void f(int a, int b)\n{\n    int c = a * b;\n}\n", "decl.point", False),
+], ids=["bitwise-and", "rvalue-ref", "multiplication"])
+def test_ref_pointer_edges(check_cxx, code, rule, should_fail):
+    assert check_cxx(code, rule) == should_fail

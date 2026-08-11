@@ -99,3 +99,17 @@ STD_COUT = '#include <iostream>\nvoid foo() { std::cout << "hello"; }\n'
 ], ids=["std-cout-ok", "printf-bad", "strlen-bad"])
 def test_c_std_functions(check_cxx, code, should_fail):
     assert check_cxx(code, "c.std_functions") == should_fail
+
+
+@pytest.mark.parametrize("code,rule,should_fail", [
+    ("void f(int x)\n{\n    int y = (x) + 1;\n}\n", "global.casts", False),
+    ("void *xmalloc(int n);\nvoid f(void)\n{\n    xmalloc(4);\n}\n", "global.memory.no_malloc", False),
+    ("void f(void *p)\n{\n    p = realloc(p, 8);\n}\n", "global.memory.no_malloc", True),
+    ("// use NULL here\nint g;\n", "global.nullptr", False),
+    ('const char *s = "NULL";\n', "global.nullptr", False),
+    ('#include "utils.hh"\n', "c.headers", False),
+    ("#include <cstdio>\nvoid f()\n{\n    std::printf(\"x\");\n}\n", "c.std_functions", False),
+], ids=["paren-not-cast", "xmalloc-ok", "realloc-flagged", "null-in-comment",
+        "null-in-string", "local-include", "std-qualified"])
+def test_cxx_global_edges(check_cxx, code, rule, should_fail):
+    assert check_cxx(code, rule) == should_fail

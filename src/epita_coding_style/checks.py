@@ -15,7 +15,6 @@ _CHAR_LITERAL = re.compile(r"'(?:\\.|[^'\\])'")
 _INIT_ASSIGN = re.compile(r'(?<![!=<>])=(?!=)')
 _CLANG_ERROR = re.compile(r'^.*:(\d+):\d+: (?:error|warning):')
 _DIGRAPHS = ('??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%', '%>', '<:', ':>')
-_ASM_KEYWORDS = ('asm(', '__asm__', '__asm')
 
 
 def _comment_ranges(nodes: NodeCache) -> list[tuple[int, int]]:
@@ -370,8 +369,11 @@ def check_ctrl_empty(path: str, lines: list[str], cfg: Config,
     v = []
     for node in nodes.get('for_statement', 'while_statement'):
         for child in node.children:
-            if child.type == 'expression_statement' \
-                    and all(c.type == ';' for c in child.children):
+            is_bare = child.type == 'expression_statement' \
+                and all(c.type == ';' for c in child.children)
+            is_braced = child.type == 'compound_statement' \
+                and all(c.type in ('{', '}', 'comment') for c in child.children)
+            if is_bare or is_braced:
                 v.append(Violation(path, child.start_point[0] + 1, "ctrl.empty",
                                   "Use 'continue' for empty loops",
                                   line_content=line_at(lines, child.start_point[0])))
@@ -417,11 +419,10 @@ def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cf
                                   line_content=line_content, column=col))
 
     if cfg.is_enabled("stat.asm"):
-        for i, line in enumerate(lines, 1):
-            s = line.strip()
-            if any(kw in s for kw in _ASM_KEYWORDS):
-                v.append(Violation(path, i, "stat.asm", "asm not allowed",
-                                  line_content=line))
+        for node in nodes.get('gnu_asm_expression', 'gnu_asm_statement'):
+            v.append(Violation(path, node.start_point[0] + 1, "stat.asm", "asm not allowed",
+                              line_content=line_at(lines, node.start_point[0]),
+                              column=node.start_point[1]))
 
     # AST-based checks for goto and cast
     if cfg.is_enabled("keyword.goto"):

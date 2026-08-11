@@ -4,6 +4,9 @@ import shutil
 import pytest
 from epita_coding_style.core import Severity
 
+pytestmark = pytest.mark.skipif(not shutil.which("clang-format"),
+                                reason="clang-format not installed")
+
 
 # Skip all tests if clang-format not installed
 pytestmark = pytest.mark.skipif(

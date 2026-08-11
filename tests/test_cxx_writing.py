@@ -449,3 +449,18 @@ def test_shared_rules_run_on_cxx(check_cxx, code, rule):
 def test_fun_length_runs_on_cxx(check_cxx):
     body = "\n".join(f"    int x{i} = {i};" for i in range(60))
     assert check_cxx(f"int f()\n{{\n{body}\n    return 0;\n}}\n", "fun.length")
+
+
+@pytest.mark.parametrize("code,rule,should_fail", [
+    ("void f()\n{\n    throw;\n}\n", "err.throw.paren", False),
+    ("void f(int a, int b)\n{\n    throw (a + b);\n}\n", "err.throw.paren", True),
+    ("void foo(void* p);\n", "fun.proto.void.cxx", False),
+    ("class Foo;\nbool operator&&(const Foo& a, const Foo& b);\n", "op.overload", True),
+    ("class Foo\n{\npublic:\n    Foo& operator&=(const Foo& o);\n};\n", "op.overload.binand", False),
+    ("class Foo\n{\npublic:\n    bool operator&&(const Foo& o);\n};\n", "op.overload.binand", False),
+    ("enum struct Color\n{\n    red,\n};\n", "enum.class", False),
+    ("enum\n{\n    kA,\n};\n", "enum.class", True),
+], ids=["bare-rethrow", "paren-expr-throw", "void-ptr-param", "free-fn-overload",
+        "binand-assign-ok", "binand-not-logical-and", "enum-struct-ok", "anonymous-enum"])
+def test_cxx_writing_edges(check_cxx, code, rule, should_fail):
+    assert check_cxx(code, rule) == should_fail

@@ -113,3 +113,7 @@ def test_comment_multi_reports_each_bad_line(check_result):
 
 def test_comment_multi_ignored_for_cxx(check_cxx):
     assert not check_cxx("/*\n * star style\n */\nint g;\n", "comment.multi")
+
+
+def test_cpp_guard_not_required_in_source(check):
+    assert not check("int x;\n", "cpp.guard")

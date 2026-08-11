@@ -153,3 +153,12 @@ def test_arg_count_complex_return_types(check, signature):
 ], ids=["void-ok", "empty-parens-fail"])
 def test_proto_void(check, code, should_fail):
     assert check(code, "fun.proto.void", suffix=".h") == should_fail
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    ("void f(int);\n", False),
+    ("void (*fp)();\n", False),
+    ("void f();\n", True),
+], ids=["proto-with-arg", "func-pointer", "proto-empty"])
+def test_fun_proto_void_header_edges(check, code, should_fail):
+    assert check(code, "fun.proto.void", suffix=".h") == should_fail

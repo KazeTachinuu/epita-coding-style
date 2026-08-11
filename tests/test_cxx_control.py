@@ -136,3 +136,9 @@ FOR_WITH_CONTINUE = dedent("""\
 ], ids=["continue-ok", "empty-while", "for-continue-ok", "empty-for"])
 def test_ctrl_empty(check_cxx, code, should_fail):
     assert check_cxx(code, "ctrl.empty") == should_fail
+
+
+def test_switch_padding_ignores_ternary_colon(check_cxx):
+    code = ("void f(int v, int y)\n{\n    switch (v)\n    {\n"
+            "    case 1:\n        v = y ? 1 : 2;\n        break;\n    }\n}\n")
+    assert not check_cxx(code, "ctrl.switch.padding")

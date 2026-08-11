@@ -4,9 +4,19 @@ import pytest
 from epita_coding_style import check_file, Violation, Severity, Config, load_config
 
 
+@pytest.fixture(autouse=True)
+def _hermetic_cwd(tmp_path, monkeypatch):
+    """Run in tmp_path so config auto-detection never sees repo files."""
+    monkeypatch.chdir(tmp_path)
+
+
 @pytest.fixture
 def check(tmp_path):
-    """Check code string for a specific rule. Returns True if violated."""
+    """Check code string for a specific rule. Returns True if violated.
+
+    Defaults to the 42sh preset, which disables keyword.goto and cast:
+    pass preset=None to test those rules.
+    """
     def _check(code: str, rule: str, suffix: str = ".c", preset: str | None = "42sh") -> bool:
         path = tmp_path / f"test{suffix}"
         if '\r' in code:
