@@ -5,7 +5,7 @@ A fast C and C++ linter for EPITA coding style rules. Uses [tree-sitter](https:/
 ## Features
 
 - **C** (.c, .h) and **C++** (.cc, .hh, .hxx) support
-- 58 rules across file formatting, functions, exports, preprocessor, declarations, control flow, naming, and more
+- 54 rules across file formatting, functions, exports, preprocessor, declarations, control flow, naming, and more
 - AST-based checks via tree-sitter (no regex hacks for structure)
 - `clang-format` integration with language-specific configs (C vs C++)
 - Configurable via TOML, presets, or CLI flags
@@ -115,8 +115,8 @@ Use `epita-coding-style --list-rules` for the full list. Key categories:
 - **Style** — Allman brace style
 - **Functions** — length, argument count, `(void)` for empty params
 - **Exports** — max exported functions/globals per `.c` file
-- **Preprocessor** — include guards, `#` column, `#endif` comments, digraphs
-- **Declarations** — one per line, no VLAs
+- **Preprocessor** — include guards, `#` column, `#endif` comments, digraphs, multi-line comment style
+- **Declarations** — one per line, no VLAs, no comma operator outside `for`
 - **Control** — no empty loop bodies
 - **Strict** — no `goto`, no explicit casts
 - **Formatting** — clang-format compliance
@@ -148,11 +148,14 @@ To disable: set `"format" = false` in your config, or use `--preset noformat`.
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/KazeTachinuu/epita-coding-style
-    rev: v3.1.0
+    rev: v3.3.1
     hooks:
       - id: epita-coding-style
         args: [--preset, 42sh]  # optional
 ```
+
+Or, with the tool already installed (`pipx install epita-coding-style`), run
+`./setup-hooks.sh` to generate the config and install the hook in one step.
 
 ## License
 
