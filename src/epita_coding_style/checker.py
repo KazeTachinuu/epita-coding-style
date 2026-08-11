@@ -287,6 +287,11 @@ Presets:
   42sh       max_lines=40, disables: goto, cast
   noformat   max_lines=40, disables: goto, cast, format
 
+Environment:
+  NO_COLOR / FORCE_COLOR         override color autodetection
+  EPITA_STYLE_NO_UPDATE_CHECK    disable the daily PyPI version check
+                                 (also skipped when CI is set)
+
 Exit codes:
   0  No major violations
   1  Major violations found
@@ -396,7 +401,7 @@ Exit codes:
               file=sys.stderr)
         return 2
     if not files:
-        print(f"{R}No C/C++ files found{RST}", file=sys.stderr)
+        print(f"{R}epita-coding-style: error: no C/C++ files found{RST}", file=sys.stderr)
         _print_update_msg()
         return 2
 
