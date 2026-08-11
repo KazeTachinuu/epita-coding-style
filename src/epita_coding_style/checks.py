@@ -153,22 +153,25 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
         line_content = line_at(lines, func.start_point[0])
         name = None
         params = []
+        plist = None
         body = None
 
         for child in func.children:
             func_decl = _find_function_declarator(child)
             if func_decl:
                 name = find_id(func_decl, content)
-                for c in func_decl.children:
-                    if c.type == 'parameter_list':
-                        params = [p for p in c.children if p.type == 'parameter_declaration']
+                plist = next((c for c in func_decl.children
+                              if c.type == 'parameter_list'), None)
+                if plist is not None:
+                    params = [p for p in plist.children if p.type == 'parameter_declaration']
             elif child.type == 'compound_statement':
                 body = child
 
         if not name:
             continue
 
-        if chk_void and not params and ('()' in text(func, content) or '( )' in text(func, content)):
+        # (void) parses as a parameter_declaration, so empty params means ()
+        if chk_void and plist is not None and not params:
             v.append(Violation(path, line_num, "fun.proto.void", f"'{name}' should use (void) for empty params",
                               line_content=line_content))
 
@@ -189,22 +192,22 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
                 if child.type == 'function_declarator':
                     name = None
                     params = []
+                    plist = None
                     for c in child.children:
                         if c.type == 'identifier':
                             name = text(c, content)
                         elif c.type == 'parameter_list':
+                            plist = c
                             params = [p for p in c.children if p.type == 'parameter_declaration']
 
                     if name:
                         line_num = child.start_point[0] + 1
                         line_content = line_at(lines, child.start_point[0])
-                        decl_text = text(child, content)
-                        if cfg.is_enabled("fun.proto.void"):
-                            if not params and ('()' in decl_text or '( )' in decl_text):
-                                v.append(Violation(path, line_num, "fun.proto.void", f"'{name}' should use (void)",
-                                                  line_content=line_content))
-                        if cfg.is_enabled("fun.arg.count") and len(params) > cfg.max_args:
-                            v.append(Violation(path, line_num, "fun.arg.count", f"'{name}' has {len(params)} args (max {cfg.max_args})",
+                        if chk_void and plist is not None and not params:
+                            v.append(Violation(path, line_num, "fun.proto.void", f"'{name}' should use (void)",
+                                              line_content=line_content))
+                        if chk_args and len(params) > max_args:
+                            v.append(Violation(path, line_num, "fun.arg.count", f"'{name}' has {len(params)} args (max {max_args})",
                                               line_content=line_content))
 
     return v

@@ -70,18 +70,22 @@ def parse_cpp(content: bytes):
 
 
 class NodeCache:
-    """Caches AST nodes by type to avoid repeated traversals."""
+    """Indexes all AST nodes by type in one traversal."""
 
     def __init__(self, root):
         self.root = root
-        self._cache: dict[str, list] = {}
+        self._by_type: dict[str, list] = {}
+        stack = [root]
+        while stack:
+            n = stack.pop()
+            self._by_type.setdefault(n.type, []).append(n)
+            stack.extend(reversed(n.children))
 
     def get(self, *types) -> list:
-        """Get all nodes of given types (cached)."""
-        key = types
-        if key not in self._cache:
-            self._cache[key] = list(find_nodes(self.root, *types))
-        return self._cache[key]
+        """All nodes of the given types, document order within each type."""
+        if len(types) == 1:
+            return self._by_type.get(types[0], [])
+        return [n for t in types for n in self._by_type.get(t, [])]
 
 
 def find_nodes(node, *types):

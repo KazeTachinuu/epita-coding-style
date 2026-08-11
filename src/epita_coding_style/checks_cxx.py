@@ -690,21 +690,15 @@ def _check_no_void_params(path: str, lines: list[str], content_bytes: bytes,
                           nodes: NodeCache) -> list[Violation]:
     """In C++, empty parameter lists should use () not (void)."""
     v = []
-    seen = set()
-    for node in nodes.get('function_definition', 'declaration', 'field_declaration'):
-        for fd in find_nodes(node, 'function_declarator'):
-            key = (fd.start_point, fd.end_point)
-            if key in seen:
-                continue
-            seen.add(key)
-            for child in fd.children:
-                if child.type == 'parameter_list':
-                    params = [p for p in child.children if p.type == 'parameter_declaration']
-                    if len(params) == 1 and text(params[0], content_bytes).strip() == 'void':
-                        name = find_id(fd, content_bytes)
-                        v.append(Violation(path, fd.start_point[0] + 1, "fun.proto.void.cxx",
-                                           f"'{name or '?'}' should use () not (void) in C++",
-                                           line_content=line_at(lines, fd.start_point[0])))
+    for fd in nodes.get('function_declarator'):
+        for child in fd.children:
+            if child.type == 'parameter_list':
+                params = [p for p in child.children if p.type == 'parameter_declaration']
+                if len(params) == 1 and text(params[0], content_bytes).strip() == 'void':
+                    name = find_id(fd, content_bytes)
+                    v.append(Violation(path, fd.start_point[0] + 1, "fun.proto.void.cxx",
+                                       f"'{name or '?'}' should use () not (void) in C++",
+                                       line_content=line_at(lines, fd.start_point[0])))
     return v
 
 
