@@ -127,3 +127,28 @@ def test_cxx_rules_disabled_by_default(rule):
 ], ids=["proto-void", "guard", "export-fun"])
 def test_c_rules_enabled_by_default(rule):
     assert Config().is_enabled(rule)
+
+
+# ── RULES registry invariants ────────────────────────────────────────────
+
+
+def test_rules_table_well_formed():
+    from epita_coding_style.config import RULES
+    for name, (desc, category, lang) in RULES.items():
+        assert desc and category, name
+        assert lang in ("c", "cxx", "both"), name
+
+
+def test_default_rules_match_registry():
+    from epita_coding_style.config import RULES
+    cfg = Config()
+    assert set(cfg.rules) == set(RULES)
+    for name, (_, _, lang) in RULES.items():
+        assert cfg.rules[name] == (lang != "cxx"), name
+
+
+def test_every_rule_has_a_category_slot():
+    from epita_coding_style.config import RULES
+    from epita_coding_style.checker import CATEGORY_ORDER
+    for name, (_, category, _) in RULES.items():
+        assert category in CATEGORY_ORDER, name

@@ -126,3 +126,16 @@ def test_braces_char_literals_no_false_positive(check, code):
 
 def test_braces_char_literal_with_violation(check):
     assert check(CHAR_WITH_VIOLATION, "braces", preset="noformat")
+
+
+def test_braces_fallback_when_clang_format_missing(tmp_path, monkeypatch):
+    """Without clang-format, check_braces takes over instead of silence."""
+    import shutil
+    from epita_coding_style import check_file, Config
+
+    monkeypatch.setattr(shutil, "which", lambda _: None)
+    path = tmp_path / "test.c"
+    path.write_text("void f(void) {\n    return;\n}\n")
+    rules = {v.rule for v in check_file(str(path), Config())}
+    assert "braces" in rules
+    assert "format" not in rules

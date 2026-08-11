@@ -103,3 +103,13 @@ def test_cpp_digraphs(check, code, should_fail):
 ])
 def test_comment_multi(check, code, should_fail):
     assert check(code, "comment.multi") == should_fail
+
+
+def test_comment_multi_reports_each_bad_line(check_result):
+    code = "/*\n * one\n * two\n*/\nint g;\n"
+    violations = check_result(code, "comment.multi")
+    assert [v.line for v in violations] == [2, 3]
+
+
+def test_comment_multi_ignored_for_cxx(check_cxx):
+    assert not check_cxx("/*\n * star style\n */\nint g;\n", "comment.multi")

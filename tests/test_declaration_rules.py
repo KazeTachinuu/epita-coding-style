@@ -118,3 +118,41 @@ STAT_SEP_FOR_INIT_OK = dedent("""\
 ], ids=["for-update", "for-init", "statement"])
 def test_stat_sep(check, code, should_fail):
     assert check(code, "stat.sep") == should_fail
+
+
+STAT_SEP_CALL_OK = dedent("""\
+    void g(int a, int b);
+    void f(int x, int y)
+    {
+        g(x, y);
+    }
+""")
+
+STAT_SEP_WHILE_BAD = dedent("""\
+    void f(int x, int y)
+    {
+        while ((x--, y))
+        {
+            continue;
+        }
+    }
+""")
+
+NESTED_COMMA_BAD = dedent("""\
+    void f(int x, int y, int z)
+    {
+        x = 1, y = 2, z = 3;
+    }
+""")
+
+
+def test_stat_sep_call_args_not_flagged(check):
+    assert not check(STAT_SEP_CALL_OK, "stat.sep")
+
+
+def test_stat_sep_while_condition_flagged(check):
+    assert check(STAT_SEP_WHILE_BAD, "stat.sep")
+
+
+def test_stat_sep_nested_comma_reported_once(check_result):
+    assert len(check_result(NESTED_COMMA_BAD, "stat.sep")) == 1
