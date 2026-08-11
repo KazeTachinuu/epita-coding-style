@@ -9,7 +9,7 @@ repos:
         name: epita-coding-style
         entry: epita-coding-style
         language: system
-        types: [c++]
+        files: \.(c|h|cc|hh|hxx|cpp|hpp)$
 EOF
 
 pre-commit install
