@@ -78,6 +78,10 @@ _CXX_RULES = frozenset(n for n, (_, _, lang) in RULES.items() if lang == "cxx")
 _C_ONLY_RULES = frozenset(n for n, (_, _, lang) in RULES.items() if lang == "c")
 
 
+class ConfigError(Exception):
+    """Invalid configuration; message is user-facing."""
+
+
 @dataclass
 class Config:
     """Checker configuration."""
@@ -88,6 +92,7 @@ class Config:
     max_globals: int = 1
 
     _user_rules: set[str] = field(default_factory=set)
+    _user_limits: set[str] = field(default_factory=set)
 
     rules: dict[str, bool] = field(default_factory=lambda: {
         name: lang != "cxx" for name, (_, _, lang) in RULES.items()
@@ -104,9 +109,10 @@ class Config:
             rules[rule] = True
         for rule in _C_ONLY_RULES - self._user_rules:
             rules[rule] = False
-        max_lines = 50 if self.max_lines == Config.max_lines else self.max_lines
+        max_lines = self.max_lines if "max_lines" in self._user_limits else 50
         return replace(self, rules=rules, max_lines=max_lines,
-                       _user_rules=set(self._user_rules))
+                       _user_rules=set(self._user_rules),
+                       _user_limits=set(self._user_limits))
 
 
 # Presets (override defaults)
@@ -146,51 +152,80 @@ def load_config(
 
     # 1. Apply CLI preset first (lowest priority for presets)
     if preset and preset in PRESETS:
-        _apply_dict(cfg, PRESETS[preset])
+        _apply_dict(cfg, PRESETS[preset], f"preset '{preset}'")
 
     # 2. Load config file
     file_data: dict[str, Any] | None = None
-    if config_path and config_path.exists():
-        file_data = _load_toml(config_path)
+    source = ""
+    if config_path:
+        if not config_path.exists():
+            raise ConfigError(f"config file not found: {config_path}")
+        file_data, source = _load_toml(config_path), str(config_path)
     else:
         # Auto-detect config files
         for name in (".epita-style", ".epita-style.toml", "epita-style.toml"):
             if Path(name).exists():
-                file_data = _load_toml(Path(name))
+                file_data, source = _load_toml(Path(name)), name
                 break
         else:
             # Check pyproject.toml
             if Path("pyproject.toml").exists():
                 data = _load_toml(Path("pyproject.toml"))
                 if "tool" in data and "epita-coding-style" in data["tool"]:
-                    file_data = data["tool"]["epita-coding-style"]
+                    file_data, source = data["tool"]["epita-coding-style"], "pyproject.toml"
 
     # 2b. Apply preset from config file (if no CLI preset), then apply config values
     if file_data:
         file_preset = file_data.get("preset")
-        if file_preset and file_preset in PRESETS and not preset:
-            _apply_dict(cfg, PRESETS[file_preset])
-        _apply_dict(cfg, file_data)
+        if file_preset is not None:
+            if file_preset not in PRESETS:
+                raise ConfigError(f"{source}: unknown preset '{file_preset}' "
+                                  f"(choose from: {', '.join(PRESETS)})")
+            if not preset:
+                _apply_dict(cfg, PRESETS[file_preset], source)
+        _apply_dict(cfg, file_data, source)
 
     # 3. Apply CLI overrides
     for key, val in overrides.items():
-        if val is not None and hasattr(cfg, key):
+        if val is not None:
             setattr(cfg, key, val)
+            cfg._user_limits.add(key)
 
     return cfg
 
 
+_LIMIT_KEYS = ("max_lines", "max_args", "max_funcs", "max_globals")
+
+
 def _load_toml(path: Path) -> dict[str, Any]:
-    """Load TOML file."""
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+    """Load TOML file, raising ConfigError on syntax errors."""
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise ConfigError(f"{path}: invalid TOML: {e}") from e
 
 
-def _apply_dict(cfg: Config, data: dict[str, Any]) -> None:
-    """Apply dictionary values to config."""
+def _apply_dict(cfg: Config, data: dict[str, Any], source: str) -> None:
+    """Apply validated config values; reject unknown keys and bad types."""
     for key, val in data.items():
-        if key == "rules" and isinstance(val, dict):
+        if key == "preset":
+            continue  # handled by load_config
+        if key == "rules":
+            if not isinstance(val, dict):
+                raise ConfigError(f"{source}: [rules] must be a table")
+            for rule, enabled in val.items():
+                if rule not in RULES:
+                    raise ConfigError(f"{source}: unknown rule '{rule}' "
+                                      f"(see --list-rules)")
+                if not isinstance(enabled, bool):
+                    raise ConfigError(f"{source}: rule '{rule}' must be true or false")
             cfg.rules.update(val)
             cfg._user_rules.update(val.keys())
-        elif hasattr(cfg, key):
+        elif key in _LIMIT_KEYS:
+            if isinstance(val, bool) or not isinstance(val, int):
+                raise ConfigError(f"{source}: {key} must be an integer")
             setattr(cfg, key, val)
+            cfg._user_limits.add(key)
+        else:
+            raise ConfigError(f"{source}: unknown key '{key}'")

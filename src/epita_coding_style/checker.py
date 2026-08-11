@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 from . import __version__
-from .config import Config, PRESETS, RULES_META, load_config
+from .config import Config, ConfigError, PRESETS, RULES_META, load_config
 from .core import Violation, Severity, parse, parse_cpp, NodeCache, Lang, lang_from_path, ALL_EXTS, CXX_BAD_EXTS
 from .checks import (
     check_file_format, check_braces, check_functions, check_exports,
@@ -289,6 +289,8 @@ Exit codes:
                            help='max arguments per function [default: 4]')
     lim_group.add_argument('--max-funcs', type=int, metavar='N',
                            help='max exported functions per file [default: 10]')
+    lim_group.add_argument('--max-globals', type=int, metavar='N',
+                           help='max exported globals per file [default: 1]')
 
     # Output
     out_group = ap.add_argument_group('Output')
@@ -328,13 +330,18 @@ Exit codes:
         _print_update_msg()
         return 0
 
-    cfg = load_config(
-        config_path=args.config,
-        preset=args.preset,
-        max_lines=args.max_lines,
-        max_args=args.max_args,
-        max_funcs=args.max_funcs,
-    )
+    try:
+        cfg = load_config(
+            config_path=args.config,
+            preset=args.preset,
+            max_lines=args.max_lines,
+            max_args=args.max_args,
+            max_funcs=args.max_funcs,
+            max_globals=args.max_globals,
+        )
+    except ConfigError as e:
+        print(f"epita-coding-style: error: {e}", file=sys.stderr)
+        return 2
 
     if args.show_config:
         _print_config(cfg, use_color=use_color)

@@ -108,6 +108,7 @@ def test_with_cxx_preserves_user_max_lines():
     """Regression: user-specified max_lines must not be overridden to 50."""
     cfg = Config()
     cfg.max_lines = 25
+    cfg._user_limits.add("max_lines")
     cxx = cfg.with_cxx()
     assert cxx.max_lines == 25
 
@@ -163,3 +164,61 @@ def test_readme_rule_count_matches_registry():
     m = re.search(r"(\d+) rules across", readme.read_text())
     assert m, "README rule-count sentence missing"
     assert int(m.group(1)) == len(RULES)
+
+
+# ── config validation ────────────────────────────────────────────────────
+
+
+def test_config_unknown_rule_errors(tmp_path, monkeypatch):
+    from epita_coding_style import load_config
+    from epita_coding_style.config import ConfigError
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".epita-style.toml").write_text('[rules]\n"keyword.gotoo" = false\n')
+    with pytest.raises(ConfigError, match="unknown rule"):
+        load_config()
+
+
+def test_config_unknown_key_errors(tmp_path, monkeypatch):
+    from epita_coding_style import load_config
+    from epita_coding_style.config import ConfigError
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".epita-style.toml").write_text("max_linez = 40\n")
+    with pytest.raises(ConfigError, match="unknown key"):
+        load_config()
+
+
+def test_config_malformed_toml_errors(tmp_path, monkeypatch):
+    from epita_coding_style import load_config
+    from epita_coding_style.config import ConfigError
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".epita-style.toml").write_text("[rules\nbad")
+    with pytest.raises(ConfigError, match="invalid TOML"):
+        load_config()
+
+
+def test_config_string_limit_errors(tmp_path, monkeypatch):
+    from epita_coding_style import load_config
+    from epita_coding_style.config import ConfigError
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".epita-style.toml").write_text('max_lines = "40"\n')
+    with pytest.raises(ConfigError, match="must be an integer"):
+        load_config()
+
+
+def test_config_missing_explicit_path_errors(tmp_path):
+    from pathlib import Path
+    from epita_coding_style import load_config
+    from epita_coding_style.config import ConfigError
+    with pytest.raises(ConfigError, match="not found"):
+        load_config(config_path=tmp_path / "nope.toml")
+
+
+def test_explicit_max_lines_survives_cxx(tmp_path, monkeypatch):
+    from epita_coding_style import load_config
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".epita-style.toml").write_text("max_lines = 30\n")
+    assert load_config().with_cxx().max_lines == 30
+
+
+def test_default_max_lines_bumps_for_cxx():
+    assert Config().with_cxx().max_lines == 50
