@@ -290,7 +290,7 @@ def check_cxx_declarations(path: str, lines: list[str], content_bytes: bytes,
 
     # decl.ref / decl.point: & and * should be next to type, not variable
     if cfg.is_enabled("decl.ref") or cfg.is_enabled("decl.point"):
-        v.extend(_check_ref_pointer_placement(path, lines, cfg))
+        v.extend(_check_ref_pointer_placement(path, lines, nodes, cfg))
 
     # decl.ctor.explicit: single-arg constructors should be explicit
     if cfg.is_enabled("decl.ctor.explicit"):
@@ -302,15 +302,27 @@ def check_cxx_declarations(path: str, lines: list[str], content_bytes: bytes,
     return v
 
 
-def _check_ref_pointer_placement(path: str, lines: list[str],
+def _scrub_comments(lines: list[str], nodes: NodeCache) -> list[str]:
+    """Return lines with comment text blanked out, using AST comment nodes."""
+    out = list(lines)
+    for c in nodes.get('comment'):
+        (sr, sc), (er, ec) = c.start_point, c.end_point
+        for r in range(sr, min(er + 1, len(out))):
+            line = out[r]
+            a = sc if r == sr else 0
+            b = ec if r == er else len(line)
+            out[r] = line[:a] + ' ' * (b - a) + line[b:]
+    return out
+
+
+def _check_ref_pointer_placement(path: str, lines: list[str], nodes: NodeCache,
                                  cfg: Config) -> list[Violation]:
     """Check that & and * are next to type, not variable name."""
     v = []
 
-    for i, line in enumerate(lines, 1):
-        line = re.sub(r'//.*', '', line)
+    for i, line in enumerate(_scrub_comments(lines, nodes), 1):
         s = line.strip()
-        if s.startswith(('#', '/*', '*')) or not _is_declaration_context(line):
+        if s.startswith('#') or not _is_declaration_context(line):
             continue
 
         if cfg.is_enabled("decl.ref"):
@@ -513,7 +525,7 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
         v.extend(_check_operator_padding(path, lines, content_bytes, nodes))
 
     if cfg.is_enabled("exp.linebreak"):
-        v.extend(_check_linebreak_operators(path, lines, root=nodes.root))
+        v.extend(_check_linebreak_operators(path, lines, nodes))
 
     if cfg.is_enabled("fun.proto.void.cxx"):
         v.extend(_check_no_void_params(path, lines, content_bytes, nodes))
@@ -664,14 +676,14 @@ _BIN_OPS = ('&&', '||', '<<', '>>', '==', '!=', '<=', '>=',
 
 
 def _check_linebreak_operators(path: str, lines: list[str],
-                               root=None) -> list[Violation]:
+                               nodes: NodeCache) -> list[Violation]:
     """Check that line breaks come before binary operators, not after."""
     v = []
-    excluded = _collect_non_binary_op_lines(root) if root else set()
+    excluded = _collect_non_binary_op_lines(nodes.root)
 
-    for i, line in enumerate(lines, 1):
-        s = re.sub(r'//.*', '', line).strip()
-        if not s or s.startswith(('#', '/*', '*')):
+    for i, line in enumerate(_scrub_comments(lines, nodes), 1):
+        s = line.strip()
+        if not s or s.startswith('#'):
             continue
         for op in _BIN_OPS:
             if s.endswith(op):

@@ -472,3 +472,12 @@ def test_cxx_writing_edges(check_cxx, code, rule, should_fail):
 ], ids=["op-in-trailing-comment", "ref-in-trailing-comment"])
 def test_comment_blindness_edges(check_cxx, code, rule, should_fail):
     assert check_cxx(code, rule) == should_fail
+
+
+@pytest.mark.parametrize("code,rule,should_fail", [
+    ("/* start\nint x = y +\n   end */\nint g = 0;\n", "exp.linebreak", False),
+    ("/* start\nint &x = y;\n   end */\nint g = 0;\n", "decl.ref", False),
+    ('int f(const char *s);\nint g(int y)\n{\n    int x = f("http://x") +\n        y;\n    return x;\n}\n', "exp.linebreak", True),
+], ids=["op-inside-block-comment", "ref-inside-block-comment", "url-string-kept"])
+def test_comment_scrub_edges(check_cxx, code, rule, should_fail):
+    assert check_cxx(code, rule) == should_fail
