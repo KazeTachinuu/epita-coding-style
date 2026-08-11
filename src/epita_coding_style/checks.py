@@ -481,27 +481,34 @@ def _find_clang_format_config(start_path: str, lang: Lang | None = None) -> str 
     return None
 
 
-def check_clang_format(path: str, cfg: Config) -> list[Violation]:
-    """Check formatting using clang-format --dry-run --Werror."""
-    if not cfg.is_enabled("format"):
-        return []
-
-    if not shutil.which("clang-format"):
-        return []
-
+def _resolve_clang_format_config(path: str) -> str | None:
+    """Config for a file: project tree first, then bundled package configs."""
     lang = lang_from_path(path)
-
-    # Find language-specific .clang-format config
     config_file = _find_clang_format_config(path, lang)
-    if not config_file:
-        # Fallback to bundled package configs
-        pkg_dir = os.path.dirname(__file__)
-        for name in _CLANG_FORMAT_CANDIDATES.get(lang, (".clang-format",)):
-            pkg_config = os.path.join(pkg_dir, name)
-            if os.path.isfile(pkg_config):
-                config_file = pkg_config
-                break
+    if config_file:
+        return config_file
+    pkg_dir = os.path.dirname(__file__)
+    for name in _CLANG_FORMAT_CANDIDATES.get(lang, (".clang-format",)):
+        pkg_config = os.path.join(pkg_dir, name)
+        if os.path.isfile(pkg_config):
+            return pkg_config
+    return None
 
+
+def _format_violation(path: str, error_lines: set[int]) -> Violation:
+    count = len(error_lines)
+    if count > 0:
+        msg = f"{count} line{'s' if count > 1 else ''} need{'s' if count == 1 else ''} formatting"
+    else:
+        msg = "Needs formatting"
+    return Violation(path, 1, "format", msg, Severity.MAJOR)
+
+
+def check_clang_format(path: str, cfg: Config) -> list[Violation]:
+    """Check one file's formatting using clang-format --dry-run --Werror."""
+    if not cfg.is_enabled("format") or not shutil.which("clang-format"):
+        return []
+    config_file = _resolve_clang_format_config(path)
     if not config_file:
         return []
 
@@ -513,19 +520,47 @@ def check_clang_format(path: str, cfg: Config) -> list[Violation]:
             text=True,
             timeout=10,
         )
-        if result.returncode != 0:
-            # Count unique lines with formatting issues
-            error_lines = set()
-            for line in result.stderr.splitlines():
-                if m := _CLANG_ERROR.match(line):
-                    error_lines.add(int(m.group(1)))
-            count = len(error_lines)
-            if count > 0:
-                msg = f"{count} line{'s' if count > 1 else ''} need{'s' if count == 1 else ''} formatting"
-            else:
-                msg = "Needs formatting"
-            return [Violation(path, 1, "format", msg, Severity.MAJOR)]
     except (subprocess.TimeoutExpired, subprocess.SubprocessError):
-        pass
+        return []
+    if result.returncode == 0:
+        return []
+    error_lines = set()
+    for line in result.stderr.splitlines():
+        if m := _CLANG_ERROR.match(line):
+            error_lines.add(int(m.group(1)))
+    return [_format_violation(path, error_lines)]
 
-    return []
+
+def check_clang_format_batch(files: list[str], cfg: Config) -> dict[str, list[Violation]]:
+    """Format-check many files with one clang-format run per config group."""
+    if not cfg.is_enabled("format") or not shutil.which("clang-format"):
+        return {}
+
+    groups: dict[str, list[str]] = {}
+    for path in files:
+        config_file = _resolve_clang_format_config(path)
+        if config_file:
+            groups.setdefault(config_file, []).append(path)
+
+    violations: dict[str, list[Violation]] = {}
+    for config_file, paths in groups.items():
+        try:
+            result = subprocess.run(
+                ["clang-format", f"--style=file:{os.path.abspath(config_file)}",
+                 "--dry-run", "--Werror", *paths],
+                capture_output=True,
+                text=True,
+                timeout=30 + len(paths),
+            )
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+            continue
+        if result.returncode == 0:
+            continue
+        error_lines: dict[str, set[int]] = {}
+        for line in result.stderr.splitlines():
+            if m := _CLANG_ERROR.match(line):
+                fname = line.split(':', 1)[0]
+                error_lines.setdefault(fname, set()).add(int(m.group(1)))
+        for fname, lines_ in error_lines.items():
+            violations[fname] = [_format_violation(fname, lines_)]
+    return violations

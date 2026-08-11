@@ -289,3 +289,17 @@ def test_pointer_left_passes_cxx_fails_c(format_passes, format_fails):
     cxx_code = "void foo()\n{\n    int* x = nullptr;\n}\n"
     format_fails(c_code, ".c", "int* x should fail in C")
     format_passes(cxx_code, ".cc", "int* x should pass in C++")
+
+
+def test_batch_matches_per_file(tmp_path):
+    from epita_coding_style import check_file, Config
+    from epita_coding_style.checks import check_clang_format_batch
+    bad = tmp_path / "bad.c"
+    bad.write_text("int main(void){return 0;}\n")
+    clean = tmp_path / "clean.c"
+    clean.write_text("int main(void)\n{\n    return 0;\n}\n")
+    cfg = Config()
+    batch = check_clang_format_batch([str(bad), str(clean)], cfg)
+    per_file = [v for v in check_file(str(bad), cfg) if v.rule == "format"]
+    assert [v.message for v in batch[str(bad)]] == [v.message for v in per_file]
+    assert str(clean) not in batch

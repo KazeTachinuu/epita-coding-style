@@ -18,7 +18,8 @@ from .config import Config, ConfigError, PRESETS, RULES_META, load_config
 from .core import Violation, Severity, parse, parse_cpp, NodeCache, Lang, lang_from_path, ALL_EXTS, CXX_BAD_EXTS
 from .checks import (
     check_file_format, check_braces, check_functions, check_exports,
-    check_preprocessor, check_misc, check_vla, check_ctrl_empty, check_clang_format,
+    check_preprocessor, check_misc, check_vla, check_ctrl_empty,
+    check_clang_format, check_clang_format_batch,
 )
 from .checks_cxx import (
     check_cxx_preprocessor, check_cxx_globals, check_cxx_naming,
@@ -26,8 +27,11 @@ from .checks_cxx import (
 )
 
 
-def check_file(path: str, cfg: Config) -> list[Violation]:
-    """Run all checks on a file, dispatching to C or C++ checks as appropriate."""
+def check_file(path: str, cfg: Config, run_format: bool = True) -> list[Violation]:
+    """Run all checks on a file, dispatching to C or C++ checks as appropriate.
+
+    run_format=False skips the per-file clang-format pass (main() batches it).
+    """
     lang = lang_from_path(path)
     if lang is None:
         return []
@@ -43,16 +47,17 @@ def check_file(path: str, cfg: Config) -> list[Violation]:
     content_bytes = content.encode()
 
     if lang == Lang.CXX:
-        return _check_cxx_file(path, cfg, content, lines, content_bytes)
-    return _check_c_file(path, cfg, content, lines, content_bytes)
+        return _check_cxx_file(path, cfg, content, lines, content_bytes, run_format)
+    return _check_c_file(path, cfg, content, lines, content_bytes, run_format)
 
 
 def _check_c_file(path: str, cfg: Config, content: str, lines: list[str],
-                  content_bytes: bytes) -> list[Violation]:
+                  content_bytes: bytes, run_format: bool = True) -> list[Violation]:
     """Run C-specific checks."""
     tree = parse(content_bytes)
     nodes = NodeCache(tree)
 
+    fmt = check_clang_format(path, cfg) if run_format else []
     return (
         check_file_format(path, content, lines, cfg) +
         check_braces(path, lines, cfg) +
@@ -62,12 +67,12 @@ def _check_c_file(path: str, cfg: Config, content: str, lines: list[str],
         check_misc(path, nodes, lines, cfg) +
         check_vla(path, nodes, content_bytes, lines, cfg) +
         check_ctrl_empty(path, lines, cfg, nodes=nodes) +
-        check_clang_format(path, cfg)
+        fmt
     )
 
 
 def _check_cxx_file(path: str, cfg: Config, content: str, lines: list[str],
-                    content_bytes: bytes) -> list[Violation]:
+                    content_bytes: bytes, run_format: bool = True) -> list[Violation]:
     """Run C++ specific checks. Automatically enables CXX rules."""
     cxx_cfg = cfg.with_cxx()
 
@@ -95,7 +100,7 @@ def _check_cxx_file(path: str, cfg: Config, content: str, lines: list[str],
         check_cxx_declarations(path, lines, content_bytes, nodes, cxx_cfg) +
         check_cxx_control(path, lines, content_bytes, nodes, cxx_cfg) +
         check_cxx_writing(path, lines, content_bytes, nodes, cxx_cfg) +
-        check_clang_format(path, cxx_cfg)
+        (check_clang_format(path, cxx_cfg) if run_format else [])
     )
 
 
@@ -416,8 +421,12 @@ Exit codes:
     total_major = total_minor = 0
     files_needing_format = []
 
+    # One clang-format invocation per config group instead of one per file
+    format_violations = check_clang_format_batch(files, cfg)
+
     for path in files:
-        violations = check_file(path, cfg)
+        violations = check_file(path, cfg, run_format=False) \
+            + format_violations.get(path, [])
         if not violations:
             continue
 
@@ -448,7 +457,10 @@ Exit codes:
 
     # Show clang-format command if there are files to format
     if files_needing_format and not args.quiet:
-        print(f"\n{Y}Fix formatting:{RST} clang-format -i {' '.join(files_needing_format)}")
+        shown = ' '.join(files_needing_format[:10])
+        more = len(files_needing_format) - 10
+        suffix = f" ... (+{more} more files)" if more > 0 else ""
+        print(f"\n{Y}Fix formatting:{RST} clang-format -i {shown}{suffix}")
 
     _print_update_msg()
 
