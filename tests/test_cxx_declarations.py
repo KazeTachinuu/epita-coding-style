@@ -4,7 +4,7 @@ import pytest
 from textwrap import dedent
 
 
-# ── decl.ref ─────────────────────────────────────────────────────────────
+# decl.ref
 
 REF_NEXT_TO_VAR = "void foo(int &x) {}\n"
 REF_NEXT_TO_TYPE = "void foo(int& x) {}\n"
@@ -18,7 +18,7 @@ def test_decl_ref(check_cxx, code, should_fail):
     assert check_cxx(code, "decl.ref") == should_fail
 
 
-# ── decl.point ───────────────────────────────────────────────────────────
+# decl.point
 
 PTR_NEXT_TO_VAR = "void foo(int *x) {}\n"
 PTR_NEXT_TO_TYPE = "void foo(int* x) {}\n"
@@ -32,7 +32,7 @@ def test_decl_point(check_cxx, code, should_fail):
     assert check_cxx(code, "decl.point") == should_fail
 
 
-# ── decl.ctor.explicit ──────────────────────────────────────────────────
+# decl.ctor.explicit
 
 CTOR_SINGLE_NOT_EXPLICIT = dedent("""\
     class Foo
@@ -108,7 +108,7 @@ def test_decl_ctor_explicit(check_cxx, code, should_fail):
     assert check_cxx(code, "decl.ctor.explicit") == should_fail
 
 
-# ── decl.vla (C++) ──────────────────────────────────────────────────────
+# decl.vla (C++)
 
 VLA_DETECTED = "void foo(int n) { int arr[n]; }\n"
 FIXED_ARRAY = "void foo() { int arr[10]; }\n"

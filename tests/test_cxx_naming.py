@@ -4,7 +4,7 @@ import pytest
 from textwrap import dedent
 
 
-# ── naming.class ─────────────────────────────────────────────────────────
+# naming.class
 
 CLASS_LOWERCASE = "class my_class {};\n"
 CLASS_SNAKE_CASE = "class my_class_name {};\n"
@@ -29,7 +29,7 @@ def test_naming_class(check_cxx, code, should_fail):
     assert check_cxx(code, "naming.class") == should_fail
 
 
-# ── naming.namespace ─────────────────────────────────────────────────────
+# naming.namespace
 
 NS_UPPERCASE = dedent("""\
     namespace MyNamespace

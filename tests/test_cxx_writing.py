@@ -4,7 +4,7 @@ import pytest
 from textwrap import dedent
 
 
-# ── braces.empty ─────────────────────────────────────────────────────────
+# braces.empty
 
 EMPTY_BODY_MULTILINE = "void foo()\n{\n}\n"
 EMPTY_BODY_SAME_LINE = "void foo() {}\n"
@@ -20,7 +20,7 @@ def test_braces_empty(check_cxx, code, should_fail):
     assert check_cxx(code, "braces.empty") == should_fail
 
 
-# ── braces.single_exp ───────────────────────────────────────────────────
+# braces.single_exp
 
 IF_WITHOUT_BRACES = dedent("""\
     void foo()
@@ -101,7 +101,7 @@ def test_braces_single_exp(check_cxx, code, should_fail):
     assert check_cxx(code, "braces.single_exp") == should_fail
 
 
-# ── err.throw ────────────────────────────────────────────────────────────
+# err.throw
 
 THROW_INTEGER = "void foo() { throw 42; }\n"
 THROW_STRING = 'void foo() { throw "error"; }\n'
@@ -119,7 +119,7 @@ def test_err_throw(check_cxx, code, should_fail):
     assert check_cxx(code, "err.throw") == should_fail
 
 
-# ── err.throw.catch ──────────────────────────────────────────────────────
+# err.throw.catch
 
 CATCH_BY_VALUE = dedent("""\
     void foo()
@@ -155,7 +155,7 @@ def test_err_throw_catch(check_cxx, code, should_fail):
     assert check_cxx(code, "err.throw.catch") == should_fail
 
 
-# ── err.throw.paren ─────────────────────────────────────────────────────
+# err.throw.paren
 
 THROW_WITH_PARENS = '#include <stdexcept>\nvoid foo() { throw(std::runtime_error("err")); }\n'
 THROW_WITHOUT_PARENS = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("err"); }\n'
@@ -169,7 +169,7 @@ def test_err_throw_paren(check_cxx, code, should_fail):
     assert check_cxx(code, "err.throw.paren") == should_fail
 
 
-# ── exp.padding ──────────────────────────────────────────────────────────
+# exp.padding
 
 OPERATOR_WITH_SPACE = dedent("""\
     class Foo
@@ -210,7 +210,7 @@ def test_exp_padding(check_cxx, code, should_fail):
     assert check_cxx(code, "exp.padding") == should_fail
 
 
-# ── fun.proto.void.cxx ──────────────────────────────────────────────────
+# fun.proto.void.cxx
 
 VOID_PARAMS = "void foo(void) {}\n"
 EMPTY_PARAMS = "void foo() {}\n"
@@ -226,7 +226,7 @@ def test_fun_proto_void_cxx(check_cxx, code, should_fail):
     assert check_cxx(code, "fun.proto.void.cxx") == should_fail
 
 
-# ── op.assign ────────────────────────────────────────────────────────────
+# op.assign
 
 ASSIGN_NO_REF_RETURN = dedent("""\
     class Foo
@@ -276,7 +276,7 @@ def test_op_assign(check_cxx, code, should_fail):
     assert check_cxx(code, "op.assign") == should_fail
 
 
-# ── op.overload ──────────────────────────────────────────────────────────
+# op.overload
 
 OVERLOAD_COMMA = dedent("""\
     class Foo
@@ -317,7 +317,7 @@ def test_op_overload(check_cxx, code, should_fail):
     assert check_cxx(code, "op.overload") == should_fail
 
 
-# ── op.overload.binand ──────────────────────────────────────────────────
+# op.overload.binand
 
 OVERLOAD_ADDRESS_OF = dedent("""\
     class Foo
@@ -331,7 +331,7 @@ def test_op_overload_binand(check_cxx):
     assert check_cxx(OVERLOAD_ADDRESS_OF, "op.overload.binand")
 
 
-# ── enum.class ───────────────────────────────────────────────────────────
+# enum.class
 
 PLAIN_ENUM = "enum Color { Red, Green, Blue };\n"
 ENUM_CLASS = "enum class Color { Red, Green, Blue };\n"
@@ -345,7 +345,7 @@ def test_enum_class(check_cxx, code, should_fail):
     assert check_cxx(code, "enum.class") == should_fail
 
 
-# ── exp.linebreak ───────────────────────────────────────────────────────
+# exp.linebreak
 
 OPERATOR_END_OF_LINE = dedent("""\
     void foo()

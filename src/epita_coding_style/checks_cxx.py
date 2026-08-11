@@ -565,7 +565,7 @@ def _check_empty_braces(path: str, lines: list[str], content_bytes: bytes,
                                    "Empty body should use {} on the same line",
                                    line_content=line_content))
             else:
-                # Same line — must be exactly `{}`, not `{ }` or `{ /* comment */ }`
+                # Same line: must be exactly `{}`, not `{ }` or `{ /* comment */ }`
                 body_text = text(node, content_bytes)
                 if body_text != '{}':
                     line_num = node.start_point[0] + 1

@@ -1,10 +1,10 @@
-"""Tests for CXX config handling — idempotency, with_cxx(), language detection."""
+"""Tests for CXX config handling: idempotency, with_cxx(), language detection."""
 
 import pytest
 from epita_coding_style import Config, Lang, lang_from_path
 
 
-# ── lang_from_path ───────────────────────────────────────────────────────
+# lang_from_path
 
 
 @pytest.mark.parametrize("path,expected", [
@@ -20,7 +20,7 @@ def test_lang_from_path(path, expected):
     assert lang_from_path(path) == expected
 
 
-# ── Config.with_cxx() ───────────────────────────────────────────────────
+# Config.with_cxx()
 
 
 def test_with_cxx_returns_new_config():
@@ -113,7 +113,7 @@ def test_with_cxx_preserves_user_max_lines():
     assert cxx.max_lines == 25
 
 
-# ── CXX defaults disabled ───────────────────────────────────────────────
+# CXX defaults disabled
 
 
 @pytest.mark.parametrize("rule", [
@@ -130,7 +130,7 @@ def test_c_rules_enabled_by_default(rule):
     assert Config().is_enabled(rule)
 
 
-# ── RULES registry invariants ────────────────────────────────────────────
+# RULES registry invariants
 
 
 def test_rules_table_well_formed():
@@ -166,7 +166,7 @@ def test_readme_rule_count_matches_registry():
     assert int(m.group(1)) == len(RULES)
 
 
-# ── config validation ────────────────────────────────────────────────────
+# config validation
 
 
 def test_config_unknown_rule_errors(tmp_path, monkeypatch):

@@ -106,32 +106,32 @@ max_lines = 40
 |---------|-------------|---------------|-------------|
 | `max_lines` | 30 | 50 | Max lines per function body |
 | `max_args` | 4 | 4 | Max arguments per function |
-| `max_funcs` | 10 | — | Max exported functions per file (C only) |
-| `max_globals` | 1 | — | Max exported globals per file (C only) |
+| `max_funcs` | 10 | n/a | Max exported functions per file (C only) |
+| `max_globals` | 1 | n/a | Max exported globals per file (C only) |
 
 ## Rules Overview
 
 Use `epita-coding-style --list-rules` for the full list. Key categories:
 
 **C rules** (enabled by default):
-- **File** — line endings, trailing whitespace, blank lines at edges or consecutive, file termination
-- **Style** — Allman brace style
-- **Functions** — length, argument count, `(void)` for empty params
-- **Exports** — max exported functions/globals per `.c` file
-- **Preprocessor** — include guards, `#` column, `#endif` comments, digraphs, multi-line comment style
-- **Declarations** — one per line, no VLAs, no inline assembly, no comma operator outside `for`
-- **Control** — no empty loop bodies
-- **Strict** — no `goto`, no explicit casts
-- **Formatting** — clang-format compliance
+- **File**: line endings, trailing whitespace, blank lines at edges or consecutive, file termination
+- **Style**: Allman brace style
+- **Functions**: length, argument count, `(void)` for empty params
+- **Exports**: max exported functions/globals per `.c` file
+- **Preprocessor**: include guards, `#` column, `#endif` comments, digraphs, multi-line comment style
+- **Declarations**: one per line, no VLAs, no inline assembly, no comma operator outside `for`
+- **Control**: no empty loop bodies
+- **Strict**: no `goto`, no explicit casts
+- **Formatting**: clang-format compliance
 
 **C++ rules** (auto-enabled for .cc/.hh/.hxx files):
-- **File** — correct extensions (.cc/.hh/.hxx, not .cpp/.hpp)
-- **Preprocessor** — `#pragma once`, include order, no source includes, `constexpr`
-- **Global** — C++ casts, no malloc, `nullptr`, no `extern "C"`, C++ headers, `std::` functions
-- **Naming** — CamelCase classes/structs, lowercase namespaces with closing comments
-- **Declarations** — `&`/`*` next to type, `explicit` constructors, no VLAs
-- **Control** — switch default case, label padding, no empty loops
-- **Writing** — empty braces, single-expression braces, throw/catch rules, operator overloads, `enum class`, no `(void)` in empty param lists
+- **File**: correct extensions (.cc/.hh/.hxx, not .cpp/.hpp)
+- **Preprocessor**: `#pragma once`, include order, no source includes, `constexpr`
+- **Global**: C++ casts, no malloc, `nullptr`, no `extern "C"`, C++ headers, `std::` functions
+- **Naming**: CamelCase classes/structs, lowercase namespaces with closing comments
+- **Declarations**: `&`/`*` next to type, `explicit` constructors, no VLAs
+- **Control**: switch default case, label padding, no empty loops
+- **Writing**: empty braces, single-expression braces, throw/catch rules, operator overloads, `enum class`, no `(void)` in empty param lists
 
 ## clang-format
 

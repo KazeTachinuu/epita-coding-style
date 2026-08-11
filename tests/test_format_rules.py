@@ -12,7 +12,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# ── General ──────────────────────────────────────────────────────────────
+# General
 
 
 def test_format_disabled(check_result):
@@ -29,7 +29,7 @@ def test_format_is_major(format_check):
     assert all(v.severity == Severity.MAJOR for v in fmt)
 
 
-# ── C: positive (should pass) ───────────────────────────────────────────
+# C: positive (should pass)
 
 
 C_GOOD_MAIN = """\
@@ -86,7 +86,7 @@ def test_c_format_pass(format_passes, code, suffix):
     format_passes(code, suffix)
 
 
-# ── C: negative (should fail) ───────────────────────────────────────────
+# C: negative (should fail)
 
 
 C_BAD_KR_BRACES = """\
@@ -134,7 +134,7 @@ def test_c_format_fail(format_fails, code, suffix):
     format_fails(code, suffix)
 
 
-# ── C++: positive (should pass) ─────────────────────────────────────────
+# C++: positive (should pass)
 
 
 CXX_GOOD_MAIN = """\
@@ -213,7 +213,7 @@ def test_cxx_format_pass(format_passes, code, suffix):
     format_passes(code, suffix)
 
 
-# ── C++: negative (should fail) ─────────────────────────────────────────
+# C++: negative (should fail)
 
 
 CXX_BAD_KR_BRACES = """\
@@ -269,7 +269,7 @@ def test_cxx_format_fail(format_fails, code, suffix):
     format_fails(code, suffix)
 
 
-# ── Cross-language: pointer alignment divergence ────────────────────────
+# Cross-language: pointer alignment divergence
 
 
 def test_pointer_right_passes_c_fails_cxx(format_passes, format_fails):

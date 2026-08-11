@@ -4,14 +4,14 @@ import pytest
 from epita_coding_style import Severity
 
 
-# ── Test data ────────────────────────────────────────────────────────────
+# Test data
 
 SOURCE_CODE = "void foo() {}\n"
 HEADER_CODE = "#pragma once\nint x;\n"
 SOURCE_WITH_NULLPTR = "void foo() { int* p = NULL; }\n"
 
 
-# ── file.ext: positive (should pass) ────────────────────────────────────
+# file.ext: positive (should pass)
 
 @pytest.mark.parametrize("code,suffix", [
     (SOURCE_CODE, ".cc"),
@@ -22,7 +22,7 @@ def test_file_ext_pass(check_cxx, code, suffix):
     assert not check_cxx(code, "file.ext", suffix=suffix)
 
 
-# ── file.ext: negative (should fail) ────────────────────────────────────
+# file.ext: negative (should fail)
 
 @pytest.mark.parametrize("code,suffix", [
     (SOURCE_CODE, ".cpp"),
@@ -32,7 +32,7 @@ def test_file_ext_fail(check_cxx, code, suffix):
     assert check_cxx(code, "file.ext", suffix=suffix)
 
 
-# ── file.ext: metadata ──────────────────────────────────────────────────
+# file.ext: metadata
 
 def test_cpp_still_gets_checked(check_cxx_result):
     """A .cpp file should still get all CXX checks, not just the ext violation."""

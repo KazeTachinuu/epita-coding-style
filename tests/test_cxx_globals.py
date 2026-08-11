@@ -3,7 +3,7 @@
 import pytest
 
 
-# ── global.casts ─────────────────────────────────────────────────────────
+# global.casts
 
 C_STYLE_CAST = "void foo() { auto x = (int)3.14; }\n"
 STATIC_CAST = "void foo() { auto x = static_cast<int>(3.14); }\n"
@@ -19,7 +19,7 @@ def test_global_casts(check_cxx, code, should_fail):
     assert check_cxx(code, "global.casts") == should_fail
 
 
-# ── global.memory.no_malloc ──────────────────────────────────────────────
+# global.memory.no_malloc
 
 MALLOC_CALL = "void foo() { int* p = malloc(sizeof(int)); }\n"
 CALLOC_CALL = "void foo() { int* p = calloc(10, sizeof(int)); }\n"
@@ -37,7 +37,7 @@ def test_global_memory(check_cxx, code, should_fail):
     assert check_cxx(code, "global.memory.no_malloc") == should_fail
 
 
-# ── global.nullptr ───────────────────────────────────────────────────────
+# global.nullptr
 
 NULL_USED = "void foo() { int* p = NULL; }\n"
 NULLPTR_USED = "void foo() { int* p = nullptr; }\n"
@@ -51,7 +51,7 @@ def test_global_nullptr(check_cxx, code, should_fail):
     assert check_cxx(code, "global.nullptr") == should_fail
 
 
-# ── c.extern ─────────────────────────────────────────────────────────────
+# c.extern
 
 EXTERN_C_SINGLE = 'extern "C" void cfunc();\n'
 EXTERN_C_BLOCK = 'extern "C" {\nvoid cfunc();\n}\n'
@@ -67,7 +67,7 @@ def test_c_extern(check_cxx, code, should_fail):
     assert check_cxx(code, "c.extern") == should_fail
 
 
-# ── c.headers ────────────────────────────────────────────────────────────
+# c.headers
 
 INCLUDE_STDIO_H = "#include <stdio.h>\nint main() { return 0; }\n"
 INCLUDE_STDLIB_H = "#include <stdlib.h>\nint main() { return 0; }\n"
@@ -85,7 +85,7 @@ def test_c_headers(check_cxx, code, should_fail):
     assert check_cxx(code, "c.headers") == should_fail
 
 
-# ── c.std_functions ──────────────────────────────────────────────────────
+# c.std_functions
 
 BARE_PRINTF = '#include <cstdio>\nvoid foo() { printf("hello"); }\n'
 BARE_STRLEN = '#include <cstring>\nvoid foo() { strlen("hello"); }\n'

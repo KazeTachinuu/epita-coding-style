@@ -4,7 +4,7 @@ import pytest
 from textwrap import dedent
 
 
-# ── ctrl.switch ──────────────────────────────────────────────────────────
+# ctrl.switch
 
 SWITCH_NO_DEFAULT = "void foo(int x) { switch (x) { case 1: break; } }\n"
 
@@ -38,7 +38,7 @@ def test_ctrl_switch(check_cxx, code, should_fail):
     assert check_cxx(code, "ctrl.switch") == should_fail
 
 
-# ── ctrl.switch.padding ─────────────────────────────────────────────────
+# ctrl.switch.padding
 
 SWITCH_SPACE_BEFORE_COLON = dedent("""\
     void foo(int x)
@@ -89,7 +89,7 @@ def test_ctrl_switch_padding(check_cxx, code, should_fail):
     assert check_cxx(code, "ctrl.switch.padding") == should_fail
 
 
-# ── ctrl.empty ───────────────────────────────────────────────────────────
+# ctrl.empty
 
 EMPTY_WHILE_BODY = dedent("""\
     void foo()

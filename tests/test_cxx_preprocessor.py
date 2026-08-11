@@ -4,7 +4,7 @@ import pytest
 from textwrap import dedent
 
 
-# ── cpp.pragma.once ──────────────────────────────────────────────────────
+# cpp.pragma.once
 
 HEADER_WITH_GUARD = "#ifndef FOO_HH\n#define FOO_HH\nint x;\n#endif\n"
 HEADER_WITH_PRAGMA = "#pragma once\nint x;\n"
@@ -20,7 +20,7 @@ def test_cpp_pragma_once(check_cxx, code, suffix, should_fail):
     assert check_cxx(code, "cpp.pragma.once", suffix=suffix) == should_fail
 
 
-# ── cpp.include.filetype ────────────────────────────────────────────────
+# cpp.include.filetype
 
 INCLUDE_SOURCE_CC = '#include "foo.cc"\nint x;\n'
 INCLUDE_SOURCE_C = '#include "foo.c"\nint x;\n'
@@ -43,7 +43,7 @@ def test_cpp_include_filetype(check_cxx, code, should_fail):
     assert check_cxx(code, "cpp.include.filetype") == should_fail
 
 
-# ── cpp.include.order ───────────────────────────────────────────────────
+# cpp.include.order
 
 # test.cc: same-name header first, then system, then local (with blank lines between groups)
 INCLUDE_ORDER_CORRECT = '#include "test.hh"\n\n#include <iostream>\n\n#include "other.hh"\n\nint x;\n'
@@ -68,7 +68,7 @@ def test_cpp_include_order_hh_hxx_at_end(check_cxx):
     assert check_cxx(HEADER_WITH_HXX_AT_END, "cpp.include.order", suffix=".hh") == False
 
 
-# ── cpp.include.order (alphabetical) ────────────────────────────────────
+# cpp.include.order (alphabetical)
 
 INCLUDES_ALPHA_OK = '#include <algorithm>\n#include <vector>\n\n#include "bar.hh"\n#include "foo.hh"\n\nint x;\n'
 INCLUDES_ALPHA_BAD = '#include <vector>\n#include <algorithm>\nint x;\n'
@@ -82,7 +82,7 @@ def test_cpp_include_order_alphabetical(check_cxx, code, should_fail):
     assert check_cxx(code, "cpp.include.order") == should_fail
 
 
-# ── cpp.include.order (blank line between groups) ───────────────────────
+# cpp.include.order (blank line between groups)
 
 INCLUDES_BLANK_LINE_OK = dedent("""\
     #include "test.hh"
@@ -107,7 +107,7 @@ def test_cpp_include_order_blank_line(check_cxx_result):
     assert len(blank_line_vs) > 0
 
 
-# ── cpp.constexpr ───────────────────────────────────────────────────────
+# cpp.constexpr
 
 CONST_LITERAL = "const int x = 42;\nint main() { return 0; }\n"
 CONSTEXPR_LITERAL = "constexpr int x = 42;\nint main() { return 0; }\n"
