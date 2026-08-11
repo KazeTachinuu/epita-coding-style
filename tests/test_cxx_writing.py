@@ -444,3 +444,8 @@ def test_exp_linebreak(check_cxx, code, should_fail):
 ], ids=["digraphs", "decl-single", "cpp-mark", "arg-count"])
 def test_shared_rules_run_on_cxx(check_cxx, code, rule):
     assert check_cxx(code, rule)
+
+
+def test_fun_length_runs_on_cxx(check_cxx):
+    body = "\n".join(f"    int x{i} = {i};" for i in range(60))
+    assert check_cxx(f"int f()\n{{\n{body}\n    return 0;\n}}\n", "fun.length")

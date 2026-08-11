@@ -145,6 +145,14 @@ It searches from the file's directory up to root, falling back to the bundled EP
 
 To disable: set `"format" = false` in your config, or use `--preset noformat`.
 
+## Editor Integration
+
+Neovim: [epita-nvim-lint](https://github.com/KazeTachinuu/epita-nvim-lint)
+lints on save via nvim-lint.
+
+Any editor that parses GCC-style diagnostics (`file:line:col: error: ...`)
+works out of the box, e.g. Vim's `:make` with `makeprg=epita-coding-style\ %`.
+
 ## Pre-commit Hook
 
 ```yaml
