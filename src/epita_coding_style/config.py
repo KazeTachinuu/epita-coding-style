@@ -162,17 +162,22 @@ def load_config(
             raise ConfigError(f"config file not found: {config_path}")
         file_data, source = _load_toml(config_path), str(config_path)
     else:
-        # Auto-detect config files
-        for name in (".epita-style", ".epita-style.toml", "epita-style.toml"):
-            if Path(name).exists():
-                file_data, source = _load_toml(Path(name)), name
+        # Auto-detect config files, walking up from cwd to the filesystem root
+        cwd = Path.cwd()
+        for directory in (cwd, *cwd.parents):
+            for name in (".epita-style", ".epita-style.toml", "epita-style.toml"):
+                p = directory / name
+                if p.exists():
+                    file_data, source = _load_toml(p), str(p)
+                    break
+            if file_data is not None:
                 break
-        else:
-            # Check pyproject.toml
-            if Path("pyproject.toml").exists():
-                data = _load_toml(Path("pyproject.toml"))
+            pyproject = directory / "pyproject.toml"
+            if pyproject.exists():
+                data = _load_toml(pyproject)
                 if "tool" in data and "epita-coding-style" in data["tool"]:
-                    file_data, source = data["tool"]["epita-coding-style"], "pyproject.toml"
+                    file_data, source = data["tool"]["epita-coding-style"], str(pyproject)
+                    break
 
     # 2b. Apply preset from config file (if no CLI preset), then apply config values
     if file_data:

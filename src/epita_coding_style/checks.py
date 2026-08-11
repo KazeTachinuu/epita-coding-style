@@ -55,10 +55,12 @@ def check_file_format(path: str, content: str, lines: list[str], cfg: Config) ->
                               line_content=lines[end_idx]))
 
     if cfg.is_enabled("lines.empty"):
-        for i, line in enumerate(lines[1:], 2):
-            if not line.strip() and not lines[i-2].strip():
+        # The final '' from a trailing newline is an artifact, not a line
+        last = len(lines) - 1 if lines and lines[-1] == '' else len(lines)
+        for i in range(2, last + 1):
+            if not lines[i - 1].strip() and not lines[i - 2].strip():
                 v.append(Violation(path, i, "lines.empty", "No consecutive empty lines",
-                                  line_content=line))
+                                  line_content=lines[i - 1]))
 
     if cfg.is_enabled("file.trailing"):
         for i, line in enumerate(lines, 1):

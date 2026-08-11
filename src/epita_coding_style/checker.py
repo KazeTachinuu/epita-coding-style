@@ -35,8 +35,9 @@ def check_file(path: str, cfg: Config) -> list[Violation]:
     try:
         with open(path, 'r', encoding='utf-8', errors='replace', newline='') as f:
             content = f.read()
-    except Exception as e:
-        return [Violation(path, 0, "file.read", str(e))]
+    except OSError as e:
+        return [Violation(path, 1, "file.read",
+                          f"Cannot read file: {e.strerror or e}")]
 
     lines = content.split('\n')
     content_bytes = content.encode()
@@ -113,7 +114,10 @@ def find_files(paths: list[str]) -> list[str]:
                 files.extend(os.path.join(root, n) for n in names if n.endswith(ALL_EXTS))
         else:
             raise FileNotFoundError(p)
-    return sorted(files)
+    unique = {}
+    for f in files:
+        unique.setdefault(os.path.abspath(f), os.path.normpath(f))
+    return sorted(unique.values())
 
 
 CATEGORY_ORDER = ["File", "Style", "Functions", "Exports", "Preprocessor",

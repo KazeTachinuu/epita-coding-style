@@ -55,3 +55,8 @@ def test_lines_empty(check, code, should_fail):
         "spurious-ws-first-line", "empty-whitespace-only"])
 def test_file_rule_edges(check, code, rule, should_fail):
     assert check(code, rule) == should_fail
+
+
+def test_lines_empty_no_phantom_line(check_result):
+    violations = check_result("int a;\n\n\n", "lines.empty")
+    assert all(v.line <= 3 for v in violations)

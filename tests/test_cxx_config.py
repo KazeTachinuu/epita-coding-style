@@ -221,3 +221,20 @@ def test_explicit_max_lines_survives_cxx(tmp_path, monkeypatch):
 
 def test_default_max_lines_bumps_for_cxx():
     assert Config().with_cxx().max_lines == 50
+
+
+def test_config_found_from_subdirectory(tmp_path, monkeypatch):
+    from epita_coding_style import load_config
+    (tmp_path / ".epita-style.toml").write_text("max_lines = 5\n")
+    sub = tmp_path / "src"
+    sub.mkdir()
+    monkeypatch.chdir(sub)
+    assert load_config().max_lines == 5
+
+
+def test_duplicate_paths_deduped(tmp_path, monkeypatch):
+    from epita_coding_style.checker import find_files
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "a.c").write_text("int x;\n")
+    assert find_files([str(tmp_path), str(tmp_path / "a.c"), "a.c"]) \
+        == [str(tmp_path / "a.c")]
