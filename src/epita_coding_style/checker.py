@@ -83,6 +83,10 @@ def _check_cxx_file(path: str, cfg: Config, content: str, lines: list[str],
     return (
         ext_violations +
         check_file_format(path, content, lines, cxx_cfg) +
+        check_braces(path, lines, cxx_cfg) +
+        check_functions(path, nodes, content_bytes, lines, cxx_cfg) +
+        check_preprocessor(path, lines, cxx_cfg, nodes=nodes, content_bytes=content_bytes) +
+        check_misc(path, nodes, content_bytes, lines, cxx_cfg) +
         check_cxx_preprocessor(path, lines, content_bytes, nodes, cxx_cfg) +
         check_cxx_globals(path, lines, content_bytes, nodes, cxx_cfg) +
         check_cxx_naming(path, lines, content_bytes, nodes, cxx_cfg) +

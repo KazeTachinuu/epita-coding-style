@@ -434,3 +434,13 @@ REAL_BINARY_OP_AT_EOL = dedent("""\
 ])
 def test_exp_linebreak(check_cxx, code, should_fail):
     assert check_cxx(code, "exp.linebreak") == should_fail
+
+
+@pytest.mark.parametrize("code,rule", [
+    ("int f()\n<%\n    return 0;\n%>\n", "cpp.digraphs"),
+    ("void f()\n{\n    int a, b;\n}\n", "decl.single"),
+    ("  #pragma once\nint g;\n", "cpp.mark"),
+    ("int f(int a, int b, int c, int d, int e)\n{\n    return a;\n}\n", "fun.arg.count"),
+], ids=["digraphs", "decl-single", "cpp-mark", "arg-count"])
+def test_shared_rules_run_on_cxx(check_cxx, code, rule):
+    assert check_cxx(code, rule)

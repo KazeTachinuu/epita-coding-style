@@ -7,7 +7,7 @@ import re
 
 from .config import Config
 from .core import Violation, Severity, NodeCache, text, find_id, find_nodes, line_at
-from .checks import check_vla, check_ctrl_empty, count_function_lines
+from .checks import check_vla, check_ctrl_empty
 
 _C_HEADERS = {
     "assert.h", "complex.h", "ctype.h", "errno.h", "fenv.h", "float.h",
@@ -528,17 +528,6 @@ def check_cxx_writing(path: str, lines: list[str], content_bytes: bytes,
 
     if cfg.is_enabled("fun.proto.void.cxx"):
         v.extend(_check_no_void_params(path, lines, content_bytes, nodes))
-
-    if cfg.is_enabled("fun.length"):
-        max_lines = cfg.max_lines
-        for func in nodes.get('function_definition'):
-            body = next((c for c in func.children if c.type == 'compound_statement'), None)
-            if body:
-                count = count_function_lines(body, lines)
-                if count > max_lines:
-                    v.append(Violation(path, func.start_point[0] + 1, "fun.length",
-                                       f"Function has {count} lines (max {max_lines})",
-                                       line_content=line_at(lines, func.start_point[0])))
 
     if cfg.is_enabled("op.assign"):
         v.extend(_check_op_assign(path, lines, content_bytes, nodes))

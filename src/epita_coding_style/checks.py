@@ -183,7 +183,7 @@ def check_functions(path: str, nodes: NodeCache, content: bytes, lines: list[str
                                   line_content=line_content))
 
     # Header declarations
-    if path.endswith('.h'):
+    if path.endswith(('.h', '.hh', '.hxx')):
         for decl in nodes.get('declaration'):
             for child in decl.children:
                 if child.type == 'function_declarator':
