@@ -57,6 +57,7 @@ include = [
     "/src",
     "/tests",
     "/README.md",
+    "/LICENSE",
 ]
 
 [tool.pytest.ini_options]

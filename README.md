@@ -17,6 +17,9 @@ A fast C and C++ linter for EPITA coding style rules. Uses [tree-sitter](https:/
 pipx install epita-coding-style
 ```
 
+Requires Python >= 3.10, and `clang-format` on PATH for the format check
+(skipped with a warning otherwise).
+
 ## Quick Start
 
 ```bash
@@ -111,12 +114,12 @@ max_lines = 40
 Use `epita-coding-style --list-rules` for the full list. Key categories:
 
 **C rules** (enabled by default):
-- **File** — line endings, trailing whitespace, blank lines, file termination
+- **File** — line endings, trailing whitespace, blank lines at edges or consecutive, file termination
 - **Style** — Allman brace style
 - **Functions** — length, argument count, `(void)` for empty params
 - **Exports** — max exported functions/globals per `.c` file
 - **Preprocessor** — include guards, `#` column, `#endif` comments, digraphs, multi-line comment style
-- **Declarations** — one per line, no VLAs, no comma operator outside `for`
+- **Declarations** — one per line, no VLAs, no inline assembly, no comma operator outside `for`
 - **Control** — no empty loop bodies
 - **Strict** — no `goto`, no explicit casts
 - **Formatting** — clang-format compliance
@@ -128,7 +131,7 @@ Use `epita-coding-style --list-rules` for the full list. Key categories:
 - **Naming** — CamelCase classes/structs, lowercase namespaces with closing comments
 - **Declarations** — `&`/`*` next to type, `explicit` constructors, no VLAs
 - **Control** — switch default case, label padding, no empty loops
-- **Writing** — empty braces, single-expression braces, throw/catch rules, operator overloads, `enum class`, function length
+- **Writing** — empty braces, single-expression braces, throw/catch rules, operator overloads, `enum class`, no `(void)` in empty param lists
 
 ## clang-format
 
