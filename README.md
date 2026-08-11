@@ -154,6 +154,9 @@ repos:
         args: [--preset, 42sh]  # optional
 ```
 
+Keep the pinned `rev` current with `pre-commit autoupdate` (pre-commit
+requires an immutable tag or SHA; branch names are cached and never update).
+
 Or, with the tool already installed (`pipx install epita-coding-style`), run
 `./setup-hooks.sh` to generate the config and install the hook in one step.
 
