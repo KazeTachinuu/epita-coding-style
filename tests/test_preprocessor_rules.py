@@ -87,3 +87,19 @@ def test_cpp_mark(check, code, should_fail):
         "digraph-in-code-with-comment"])
 def test_cpp_digraphs(check, code, should_fail):
     assert check(code, "cpp.digraphs") == should_fail
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    ("/* ok */\nint g;\n", False),
+    ("// ok\nint g;\n", False),
+    ("/*\n** ok\n*/\nint g;\n", False),
+    ("/**\n** \\brief doxygen ok\n*/\nint g;\n", False),
+    ("/*\n * bad star style\n */\nint g;\n", True),
+    ("/* bad opener\n** text\n*/\nint g;\n", True),
+    ("/*\n** text\n** bad closer */\nint g;\n", True),
+], ids=[
+    "single-line", "line-comment", "double-star", "doxygen",
+    "star-continuation", "text-after-opener", "text-before-closer",
+])
+def test_comment_multi(check, code, should_fail):
+    assert check(code, "comment.multi") == should_fail

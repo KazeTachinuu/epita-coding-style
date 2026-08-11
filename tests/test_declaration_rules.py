@@ -81,3 +81,40 @@ COND_ARRAY_ACCESS = dedent("""\
 ])
 def test_decl_vla(check, code, should_fail):
     assert check(code, "decl.vla") == should_fail
+
+
+STAT_SEP_FOR_OK = dedent("""\
+    void f(void)
+    {
+        for (int i = 0; i < 8; i++, i++)
+        {
+            continue;
+        }
+    }
+""")
+
+STAT_SEP_STMT_BAD = dedent("""\
+    void f(int x, int y)
+    {
+        x = 3, y = 4;
+    }
+""")
+
+STAT_SEP_FOR_INIT_OK = dedent("""\
+    void f(int i, int j)
+    {
+        for (i = 0, j = 0; i < 5; i++)
+        {
+            continue;
+        }
+    }
+""")
+
+
+@pytest.mark.parametrize("code,should_fail", [
+    (STAT_SEP_FOR_OK, False),
+    (STAT_SEP_FOR_INIT_OK, False),
+    (STAT_SEP_STMT_BAD, True),
+], ids=["for-update", "for-init", "statement"])
+def test_stat_sep(check, code, should_fail):
+    assert check(code, "stat.sep") == should_fail

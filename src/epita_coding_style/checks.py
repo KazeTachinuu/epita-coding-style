@@ -264,6 +264,9 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config,
             v.append(Violation(path, 1, "cpp.guard", f"Missing include guard (#ifndef {guard})",
                               line_content=lines[0] if lines else None))
 
+    if cfg.is_enabled("comment.multi"):
+        v.extend(_check_comment_multi(path, nodes, content_bytes, lines))
+
     check_mark = cfg.is_enabled("cpp.mark")
     check_if = cfg.is_enabled("cpp.if")
     check_digraphs = cfg.is_enabled("cpp.digraphs")
@@ -301,6 +304,33 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config,
                                           line_content=line, column=col))
                     col = line.find(d, col + 1)
 
+    return v
+
+
+def _check_comment_multi(path: str, nodes: NodeCache, content: bytes,
+                         lines: list[str]) -> list[Violation]:
+    """Multi-line comments: bare '/*' or '/**' opener, '**' continuations,
+    '*/' alone on the closing line (spec 4.7)."""
+    v = []
+    for n in nodes.get('comment'):
+        txt = text(n, content)
+        if not txt.startswith('/*') or '\n' not in txt:
+            continue
+        row = n.start_point[0]
+        first, *rest = txt.split('\n')
+        if first not in ('/*', '/**'):
+            v.append(Violation(path, row + 1, "comment.multi",
+                              "Multi-line comment must open with '/*' on its own line",
+                              line_content=line_at(lines, row)))
+        for off, cont in enumerate(rest[:-1], 1):
+            if not cont.strip().startswith('**'):
+                v.append(Violation(path, row + off + 1, "comment.multi",
+                                  "Comment continuation must start with '**'",
+                                  line_content=line_at(lines, row + off)))
+        if rest[-1].strip() != '*/':
+            v.append(Violation(path, row + len(rest) + 1, "comment.multi",
+                              "'*/' must be on its own line",
+                              line_content=line_at(lines, row + len(rest))))
     return v
 
 
@@ -401,6 +431,20 @@ def check_misc(path: str, nodes: NodeCache, content: bytes, lines: list[str], cf
             line_num = node.start_point[0] + 1
             v.append(Violation(path, line_num, "cast", "Explicit cast not allowed",
                               line_content=line_at(lines, node.start_point[0]), column=node.start_point[1]))
+
+    # stat.sep: comma operator allowed only in 'for' clauses (spec 5.25)
+    if cfg.is_enabled("stat.sep"):
+        for node in nodes.get('comma_expression'):
+            parent = node.parent
+            if parent.type == 'comma_expression':
+                continue  # report only the outermost expression
+            while parent is not None and parent.type == 'parenthesized_expression':
+                parent = parent.parent
+            if parent is not None and parent.type != 'for_statement':
+                v.append(Violation(path, node.start_point[0] + 1, "stat.sep",
+                                  "Comma operator only allowed in 'for'",
+                                  line_content=line_at(lines, node.start_point[0]),
+                                  column=node.start_point[1]))
 
     return v
 
