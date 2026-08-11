@@ -277,10 +277,11 @@ def check_preprocessor(path: str, lines: list[str], cfg: Config,
 
     # Line start offsets map (line, col) to byte positions
     line_offsets = []
-    offset = 0
-    for line in lines:
-        line_offsets.append(offset)
-        offset += len(line) + 1
+    if check_digraphs:
+        offset = 0
+        for line in lines:
+            line_offsets.append(offset)
+            offset += len(line) + 1
 
     for i, line in enumerate(lines, 1):
         s = line.strip()

@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
 import threading
+import time
 import urllib.request
 from pathlib import Path
 
@@ -72,8 +74,7 @@ def _check_cxx_file(path: str, cfg: Config, content: str, lines: list[str],
     ext_violations = []
     if cxx_cfg.is_enabled("file.ext") and path.endswith(CXX_BAD_EXTS):
         ext = Path(path).suffix
-        ext_map = {'.cpp': '.cc', '.hpp': '.hh'}
-        expected = ext_map.get(ext, '.cc')
+        expected = {'.cpp': '.cc', '.hpp': '.hh'}[ext]
         ext_violations = [Violation(path, 1, "file.ext",
                                     f"Use '{expected}' extension instead of '{ext}'")]
 
@@ -98,14 +99,20 @@ def _check_cxx_file(path: str, cfg: Config, content: str, lines: list[str],
 
 
 def find_files(paths: list[str]) -> list[str]:
-    """Find all C and C++ source files."""
+    """Find all C and C++ source files. Raises FileNotFoundError for bad paths."""
     files = []
     for p in paths:
-        if os.path.isfile(p) and p.endswith(ALL_EXTS):
-            files.append(p)
+        if os.path.isfile(p):
+            if p.endswith(ALL_EXTS):
+                files.append(p)
+            else:
+                print(f"epita-coding-style: skipping '{p}': unsupported extension",
+                      file=sys.stderr)
         elif os.path.isdir(p):
             for root, _, names in os.walk(p):
                 files.extend(os.path.join(root, n) for n in names if n.endswith(ALL_EXTS))
+        else:
+            raise FileNotFoundError(p)
     return sorted(files)
 
 
@@ -217,22 +224,44 @@ def _check_for_update() -> str | None:
 
 
 _update_result: str | None = None
+_update_started = False
 _update_done = threading.Event()
 
 
+def _update_stamp() -> Path:
+    cache_home = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+    return Path(cache_home) / "epita-coding-style" / "last-update-check"
+
+
 def _start_update_check() -> None:
-    """Fire-and-forget version check in a daemon thread."""
+    """Version check in a daemon thread; at most once a day, opt-out via env."""
+    global _update_started
+    if os.environ.get("CI") or os.environ.get("EPITA_STYLE_NO_UPDATE_CHECK"):
+        return
+    stamp = _update_stamp()
+    try:
+        if time.time() - stamp.stat().st_mtime < 86400:
+            return
+    except OSError:
+        pass
+
     def _worker():
         global _update_result
         _update_result = _check_for_update()
+        try:
+            stamp.parent.mkdir(parents=True, exist_ok=True)
+            stamp.touch()
+        except OSError:
+            pass
         _update_done.set()
 
+    _update_started = True
     threading.Thread(target=_worker, daemon=True).start()
 
 
 def _print_update_msg() -> None:
     """Print update message if the background check finished in time."""
-    if not _update_done.wait(timeout=1):
+    if not _update_started or not _update_done.wait(timeout=1):
         return
     if _update_result:
         C = "\033[36m" if sys.stderr.isatty() else ""
@@ -260,7 +289,8 @@ Presets:
 
 Exit codes:
   0  No major violations
-  1  Major violations found or error
+  1  Major violations found
+  2  Usage, config, or file error
 """
 
     ap = argparse.ArgumentParser(
@@ -272,7 +302,8 @@ Exit codes:
 
     # Positional
     ap.add_argument('paths', nargs='*', metavar='PATH',
-                    help='files or directories to check (recursively finds .c/.h/.cc/.hh/.hxx)')
+                    help="files or directories to check (recursively finds "
+                         ".c/.h/.cc/.hh/.hxx); '-' reads paths from stdin")
 
     # Config options
     cfg_group = ap.add_argument_group('Config')
@@ -353,11 +384,25 @@ Exit codes:
 
     R, Y, W, RST = ('\033[91m', '\033[93m', '\033[97m', '\033[0m') if use_color else ('', '', '', '')
 
-    files = find_files(args.paths)
+    paths = args.paths
+    if '-' in paths:
+        paths = [p for p in paths if p != '-'] + \
+                [line.strip() for line in sys.stdin if line.strip()]
+
+    try:
+        files = find_files(paths)
+    except FileNotFoundError as e:
+        print(f"epita-coding-style: error: {e.args[0]}: no such file or directory",
+              file=sys.stderr)
+        return 2
     if not files:
         print(f"{R}No C/C++ files found{RST}", file=sys.stderr)
         _print_update_msg()
-        return 1
+        return 2
+
+    if cfg.is_enabled("format") and not shutil.which("clang-format"):
+        print("epita-coding-style: warning: clang-format not found, "
+              "format check skipped", file=sys.stderr)
 
     total_major = total_minor = 0
     files_needing_format = []
@@ -381,7 +426,7 @@ Exit codes:
                 color = R if is_major else Y
                 col_str = f":{v.column + 1}" if v.column is not None else ":1"
                 print(f"{color}{path}:{v.line}{col_str}: {'error' if is_major else 'warning'}: {v.message} [epita-{v.rule}]{RST}")
-                if v.line_content is not None:
+                if v.line_content and v.line_content.strip():
                     print(f"{v.line_content}")
                     if v.column is not None:
                         print(f"{' ' * v.column}{color}^{RST}")
@@ -393,7 +438,7 @@ Exit codes:
     print(f"\n{W}Files: {len(files)}  Major: {R}{total_major}{RST}  Minor: {Y}{total_minor}{RST}")
 
     # Show clang-format command if there are files to format
-    if files_needing_format:
+    if files_needing_format and not args.quiet:
         print(f"\n{Y}Fix formatting:{RST} clang-format -i {' '.join(files_needing_format)}")
 
     _print_update_msg()

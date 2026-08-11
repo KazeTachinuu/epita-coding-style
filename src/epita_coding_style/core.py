@@ -86,11 +86,10 @@ class NodeCache:
 
 def find_nodes(node, *types):
     """Yield all descendant nodes matching given types."""
-    type_set = set(types) if len(types) > 2 else types
     stack = [node]
     while stack:
         n = stack.pop()
-        if n.type in type_set:
+        if n.type in types:
             yield n
         stack.extend(reversed(n.children))
 

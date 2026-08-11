@@ -290,7 +290,7 @@ def check_cxx_declarations(path: str, lines: list[str], content_bytes: bytes,
 
     # decl.ref / decl.point: & and * should be next to type, not variable
     if cfg.is_enabled("decl.ref") or cfg.is_enabled("decl.point"):
-        v.extend(_check_ref_pointer_placement(path, lines, content_bytes, nodes, cfg))
+        v.extend(_check_ref_pointer_placement(path, lines, cfg))
 
     # decl.ctor.explicit: single-arg constructors should be explicit
     if cfg.is_enabled("decl.ctor.explicit"):
@@ -302,39 +302,27 @@ def check_cxx_declarations(path: str, lines: list[str], content_bytes: bytes,
     return v
 
 
-def _check_ref_pointer_placement(path: str, lines: list[str], content_bytes: bytes,
-                                 nodes: NodeCache, cfg: Config) -> list[Violation]:
+def _check_ref_pointer_placement(path: str, lines: list[str],
+                                 cfg: Config) -> list[Violation]:
     """Check that & and * are next to type, not variable name."""
     v = []
 
     for i, line in enumerate(lines, 1):
         s = line.strip()
-        if s.startswith(('#', '//', '/*', '*')):
+        if s.startswith(('#', '//', '/*', '*')) or not _is_declaration_context(line):
             continue
 
         if cfg.is_enabled("decl.ref"):
             for m in _REF_PATTERN.finditer(line):
-                # Avoid matching && (logical and) or &= etc.
-                pos = m.start(0)
-                # Check it's not inside a string or preceded by another &
-                amp_pos = line.index('&', pos)
-                if amp_pos + 1 < len(line) and line[amp_pos + 1] == '&':
-                    continue  # It's && operator
-                # Check context: should be in a declaration context
-                if _is_declaration_context(line):
-                    v.append(Violation(path, i, "decl.ref",
-                                       "& should be next to type, not variable",
-                                       line_content=line, column=amp_pos))
+                v.append(Violation(path, i, "decl.ref",
+                                   "& should be next to type, not variable",
+                                   line_content=line, column=line.index('&', m.start())))
 
         if cfg.is_enabled("decl.point"):
             for m in _PTR_PATTERN.finditer(line):
-                pos = m.start(0)
-                star_pos = line.index('*', pos)
-                # Skip if inside a comment or multiplication
-                if _is_declaration_context(line):
-                    v.append(Violation(path, i, "decl.point",
-                                       "* should be next to type, not variable",
-                                       line_content=line, column=star_pos))
+                v.append(Violation(path, i, "decl.point",
+                                   "* should be next to type, not variable",
+                                   line_content=line, column=line.index('*', m.start())))
 
     return v
 
