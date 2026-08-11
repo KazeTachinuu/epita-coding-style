@@ -170,9 +170,15 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
-@test "no files found fails" {
+@test "nonexistent path is an operational error (exit 2)" {
     run uv run epita-coding-style "$TMP_DIR/nonexistent/"
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
+}
+
+@test "empty directory is an operational error (exit 2)" {
+    mkdir -p "$TMP_DIR/emptydir"
+    run uv run epita-coding-style "$TMP_DIR/emptydir/"
+    [ "$status" -eq 2 ]
 }
 
 @test "--list-rules works" {
