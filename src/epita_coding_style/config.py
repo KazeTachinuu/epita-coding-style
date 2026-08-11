@@ -1,6 +1,6 @@
 """Configuration system for EPITA C/C++ Coding Style Checker."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -11,76 +11,71 @@ except ImportError:
     import tomli as tomllib  # type: ignore
 
 
-# Rule metadata: (short_description, category)
-RULES_META: dict[str, tuple[str, str]] = {
-    # File format
-    "file.dos": ("No CRLF line endings (use Unix LF)", "File"),
-    "file.terminate": ("File must end with a newline", "File"),
-    "file.spurious": ("No blank lines at file start/end", "File"),
-    "file.trailing": ("No trailing whitespace", "File"),
-    "lines.empty": ("No consecutive empty lines", "File"),
-    # Braces
-    "braces": ("Allman brace style (braces on own line)", "Style"),
-    # Functions
-    "fun.length": ("Max lines per function body", "Functions"),
-    "fun.arg.count": ("Max arguments per function", "Functions"),
-    "fun.proto.void": ("Use (void) for functions with no parameters", "Functions"),
-    # Exports
-    "export.fun": ("Max exported (non-static) functions per file", "Exports"),
-    "export.other": ("Max exported global variables per file", "Exports"),
-    # Preprocessor
-    "cpp.guard": ("Header files must have include guards", "Preprocessor"),
-    "cpp.mark": ("# must be in first column", "Preprocessor"),
-    "cpp.if": ("#endif should have a comment", "Preprocessor"),
-    "cpp.digraphs": ("No digraphs or trigraphs", "Preprocessor"),
-    # Declarations & control
-    "decl.single": ("One variable declaration per line", "Declarations"),
-    "decl.vla": ("No variable-length arrays", "Declarations"),
-    "stat.asm": ("No inline assembly", "Declarations"),
-    "ctrl.empty": ("Use 'continue' in empty loop bodies", "Control"),
-    # Strict
-    "keyword.goto": ("No goto statements", "Strict"),
-    "cast": ("No explicit casts", "Strict"),
-    # Formatting
-    "format": ("clang-format compliance check", "Formatting"),
-    # CXX-File
-    "file.ext": ("C++ files must use .cc/.hh/.hxx extensions (not .cpp/.hpp)", "CXX-File"),
-    # CXX-Preprocessor
-    "cpp.pragma.once": ("Use #pragma once instead of include guards", "CXX-Preprocessor"),
-    "cpp.include.filetype": ("Only include .hh/.hxx files (no source files)", "CXX-Preprocessor"),
-    "cpp.include.order": ("Includes ordered: same-name header, system, local", "CXX-Preprocessor"),
-    "cpp.constexpr": ("Compile-time constants should use constexpr", "CXX-Preprocessor"),
-    # CXX-Global
-    "global.casts": ("Must use C++ casts (static_cast etc.), not C-style", "CXX-Global"),
-    "global.memory.no_malloc": ("No malloc/calloc/realloc/free", "CXX-Global"),
-    "global.nullptr": ("Use nullptr, not NULL", "CXX-Global"),
-    "c.extern": ("No extern \"C\"", "CXX-Global"),
-    "c.headers": ("No C headers (use <cstdio> not <stdio.h>)", "CXX-Global"),
-    "c.std_functions": ("Use std:: equivalents", "CXX-Global"),
-    # CXX-Naming
-    "naming.class": ("CamelCase class/struct names", "CXX-Naming"),
-    "naming.namespace": ("Lowercase namespaces, closing comment", "CXX-Naming"),
-    # CXX-Declarations
-    "decl.ref": ("& next to type, not variable", "CXX-Declarations"),
-    "decl.ctor.explicit": ("Single-arg constructors should be explicit", "CXX-Declarations"),
-    "decl.point": ("* next to type, not variable", "CXX-Declarations"),
-    # CXX-Control
-    "ctrl.switch": ("Default case rules for switch", "CXX-Control"),
-    "ctrl.switch.padding": ("No space before label colon", "CXX-Control"),
-    # CXX-Writing
-    "braces.empty": ("{} on same line for empty bodies", "CXX-Writing"),
-    "braces.single_exp": ("Prefer braces for single-expression blocks", "CXX-Writing"),
-    "err.throw": ("Don't throw literals", "CXX-Writing"),
-    "err.throw.catch": ("Catch by reference", "CXX-Writing"),
-    "err.throw.paren": ("No parentheses after throw", "CXX-Writing"),
-    "exp.padding": ("No space in operator keyword (operator++ not operator ++)", "CXX-Writing"),
-    "exp.linebreak": ("Line breaks before binary operators", "CXX-Writing"),
-    "fun.proto.void.cxx": ("MUST NOT use void in C++ empty params", "CXX-Writing"),
-    "op.assign": ("Return Class& and *this from assignment operators", "CXX-Writing"),
-    "op.overload": ("Don't overload operator,, operator||, operator&&", "CXX-Writing"),
-    "op.overload.binand": ("Don't overload operator&", "CXX-Writing"),
-    "enum.class": ("Prefer enum class over plain enum", "CXX-Writing"),
+# Single source of truth: rule -> (description, category, lang).
+# lang: "c" = C only (disabled for C++), "cxx" = C++ only (enabled by
+# with_cxx), "both" = language-independent. Default enabled unless "cxx".
+RULES: dict[str, tuple[str, str, str]] = {
+    "file.dos": ("No CRLF line endings (use Unix LF)", "File", "both"),
+    "file.terminate": ("File must end with a newline", "File", "both"),
+    "file.spurious": ("No blank lines at file start/end", "File", "both"),
+    "file.trailing": ("No trailing whitespace", "File", "both"),
+    "lines.empty": ("No consecutive empty lines", "File", "both"),
+    "braces": ("Allman brace style (braces on own line)", "Style", "both"),
+    "fun.length": ("Max lines per function body", "Functions", "both"),
+    "fun.arg.count": ("Max arguments per function", "Functions", "both"),
+    "fun.proto.void": ("Use (void) for functions with no parameters", "Functions", "c"),
+    "export.fun": ("Max exported (non-static) functions per file", "Exports", "c"),
+    "export.other": ("Max exported global variables per file", "Exports", "c"),
+    "cpp.guard": ("Header files must have include guards", "Preprocessor", "c"),
+    "cpp.mark": ("# must be in first column", "Preprocessor", "both"),
+    "cpp.if": ("#endif should have a comment", "Preprocessor", "both"),
+    "cpp.digraphs": ("No digraphs or trigraphs", "Preprocessor", "both"),
+    "comment.multi": ("Multi-line comment lines start with '**'", "Preprocessor", "c"),
+    "decl.single": ("One variable declaration per line", "Declarations", "both"),
+    "decl.vla": ("No variable-length arrays", "Declarations", "both"),
+    "stat.asm": ("No inline assembly", "Declarations", "both"),
+    "stat.sep": ("No comma operator outside 'for'", "Declarations", "c"),
+    "ctrl.empty": ("Use 'continue' in empty loop bodies", "Control", "both"),
+    "keyword.goto": ("No goto statements", "Strict", "c"),
+    "cast": ("No explicit casts", "Strict", "c"),
+    "format": ("clang-format compliance check", "Formatting", "both"),
+    "file.ext": ("C++ files must use .cc/.hh/.hxx extensions (not .cpp/.hpp)", "CXX-File", "cxx"),
+    "cpp.pragma.once": ("Use #pragma once instead of include guards", "CXX-Preprocessor", "cxx"),
+    "cpp.include.filetype": ("Only include .hh/.hxx files (no source files)", "CXX-Preprocessor", "cxx"),
+    "cpp.include.order": ("Includes ordered: same-name header, system, local", "CXX-Preprocessor", "cxx"),
+    "cpp.constexpr": ("Compile-time constants should use constexpr", "CXX-Preprocessor", "cxx"),
+    "global.casts": ("Must use C++ casts (static_cast etc.), not C-style", "CXX-Global", "cxx"),
+    "global.memory.no_malloc": ("No malloc/calloc/realloc/free", "CXX-Global", "cxx"),
+    "global.nullptr": ("Use nullptr, not NULL", "CXX-Global", "cxx"),
+    "c.extern": ("No extern \"C\"", "CXX-Global", "cxx"),
+    "c.headers": ("No C headers (use <cstdio> not <stdio.h>)", "CXX-Global", "cxx"),
+    "c.std_functions": ("Use std:: equivalents", "CXX-Global", "cxx"),
+    "naming.class": ("CamelCase class/struct names", "CXX-Naming", "cxx"),
+    "naming.namespace": ("Lowercase namespaces, closing comment", "CXX-Naming", "cxx"),
+    "decl.ref": ("& next to type, not variable", "CXX-Declarations", "cxx"),
+    "decl.ctor.explicit": ("Single-arg constructors should be explicit", "CXX-Declarations", "cxx"),
+    "decl.point": ("* next to type, not variable", "CXX-Declarations", "cxx"),
+    "ctrl.switch": ("Default case rules for switch", "CXX-Control", "cxx"),
+    "ctrl.switch.padding": ("No space before label colon", "CXX-Control", "cxx"),
+    "braces.empty": ("{} on same line for empty bodies", "CXX-Writing", "cxx"),
+    "braces.single_exp": ("Prefer braces for single-expression blocks", "CXX-Writing", "cxx"),
+    "err.throw": ("Don't throw literals", "CXX-Writing", "cxx"),
+    "err.throw.catch": ("Catch by reference", "CXX-Writing", "cxx"),
+    "err.throw.paren": ("No parentheses after throw", "CXX-Writing", "cxx"),
+    "exp.padding": ("No space in operator keyword (operator++ not operator ++)", "CXX-Writing", "cxx"),
+    "exp.linebreak": ("Line breaks before binary operators", "CXX-Writing", "cxx"),
+    "fun.proto.void.cxx": ("MUST NOT use void in C++ empty params", "CXX-Writing", "cxx"),
+    "op.assign": ("Return Class& and *this from assignment operators", "CXX-Writing", "cxx"),
+    "op.overload": ("Don't overload operator,, operator||, operator&&", "CXX-Writing", "cxx"),
+    "op.overload.binand": ("Don't overload operator&", "CXX-Writing", "cxx"),
+    "enum.class": ("Prefer enum class over plain enum", "CXX-Writing", "cxx"),
 }
+
+RULES_META: dict[str, tuple[str, str]] = {
+    name: (desc, cat) for name, (desc, cat, _) in RULES.items()
+}
+_CXX_RULES = frozenset(n for n, (_, _, lang) in RULES.items() if lang == "cxx")
+_C_ONLY_RULES = frozenset(n for n, (_, _, lang) in RULES.items() if lang == "c")
 
 
 @dataclass
@@ -95,103 +90,23 @@ class Config:
     _user_rules: set[str] = field(default_factory=set)
 
     rules: dict[str, bool] = field(default_factory=lambda: {
-        # File format
-        "file.dos": True,
-        "file.terminate": True,
-        "file.spurious": True,
-        "file.trailing": True,
-        "lines.empty": True,
-        # Braces
-        "braces": True,
-        # Functions
-        "fun.length": True,
-        "fun.arg.count": True,
-        "fun.proto.void": True,
-        # Exports
-        "export.fun": True,
-        "export.other": True,
-        # Preprocessor
-        "cpp.guard": True,
-        "cpp.mark": True,
-        "cpp.if": True,
-        "cpp.digraphs": True,
-        # Declarations & control
-        "decl.single": True,
-        "decl.vla": True,
-        "stat.asm": True,
-        "ctrl.empty": True,
-        # Strict rules (often disabled for specific projects)
-        "keyword.goto": True,
-        "cast": True,
-        # Formatting (uses clang-format)
-        "format": True,
-        # CXX rules (disabled by default, enabled when checking C++ files)
-        "file.ext": False,
-        "cpp.pragma.once": False,
-        "cpp.include.filetype": False,
-        "cpp.include.order": False,
-        "cpp.constexpr": False,
-        "global.casts": False,
-        "global.memory.no_malloc": False,
-        "global.nullptr": False,
-        "c.extern": False,
-        "c.headers": False,
-        "c.std_functions": False,
-        "naming.class": False,
-        "naming.namespace": False,
-        "decl.ref": False,
-        "decl.ctor.explicit": False,
-        "decl.point": False,
-        "ctrl.switch": False,
-        "ctrl.switch.padding": False,
-        "braces.empty": False,
-        "braces.single_exp": False,
-        "err.throw": False,
-        "err.throw.catch": False,
-        "err.throw.paren": False,
-        "exp.padding": False,
-        "exp.linebreak": False,
-        "fun.proto.void.cxx": False,
-        "op.assign": False,
-        "op.overload": False,
-        "op.overload.binand": False,
-        "enum.class": False,
+        name: lang != "cxx" for name, (_, _, lang) in RULES.items()
     })
 
     def is_enabled(self, rule: str) -> bool:
         """Check if a rule is enabled."""
         return self.rules.get(rule, True)
 
-    _CXX_RULES = frozenset({
-        "file.ext", "cpp.pragma.once", "cpp.include.filetype", "cpp.include.order",
-        "cpp.constexpr", "global.casts", "global.memory.no_malloc",
-        "global.nullptr", "c.extern", "c.headers", "c.std_functions",
-        "naming.class", "naming.namespace", "decl.ref", "decl.ctor.explicit",
-        "decl.point", "ctrl.switch", "ctrl.switch.padding",
-        "braces.empty", "braces.single_exp", "err.throw", "err.throw.catch",
-        "err.throw.paren", "exp.padding", "exp.linebreak", "fun.proto.void.cxx",
-        "op.assign", "op.overload", "op.overload.binand", "enum.class",
-    })
-
-    _C_ONLY_RULES = frozenset({
-        "cpp.guard", "export.fun", "export.other",
-        "fun.proto.void", "keyword.goto", "cast",
-    })
-
-    _DEFAULT_MAX_LINES = 30
-
     def with_cxx(self) -> "Config":
         """Return a copy with CXX rules enabled and C-only rules disabled."""
-        import copy
-        cfg = copy.deepcopy(self)
-        user = cfg._user_rules
-        for rule in self._CXX_RULES - user:
-            cfg.rules[rule] = True
-        for rule in self._C_ONLY_RULES - user:
-            cfg.rules[rule] = False
-        if cfg.max_lines == self._DEFAULT_MAX_LINES:
-            cfg.max_lines = 50
-        return cfg
+        rules = dict(self.rules)
+        for rule in _CXX_RULES - self._user_rules:
+            rules[rule] = True
+        for rule in _C_ONLY_RULES - self._user_rules:
+            rules[rule] = False
+        max_lines = 50 if self.max_lines == Config.max_lines else self.max_lines
+        return replace(self, rules=rules, max_lines=max_lines,
+                       _user_rules=set(self._user_rules))
 
 
 # Presets (override defaults)
