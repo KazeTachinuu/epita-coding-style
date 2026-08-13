@@ -1,15 +1,6 @@
 # EPITA C/C++ Coding Style Checker
 
-A fast C and C++ linter for EPITA coding style rules. Uses [tree-sitter](https://tree-sitter.github.io/) for robust AST-based parsing.
-
-## Features
-
-- **C** (.c, .h) and **C++** (.cc, .hh, .hxx) support
-- 54 rules across file formatting, functions, exports, preprocessor, declarations, control flow, naming, and more
-- AST-based checks via tree-sitter (no regex hacks for structure)
-- `clang-format` integration with language-specific configs (C vs C++)
-- Configurable via TOML, presets, or CLI flags
-- Pre-commit hook support
+A fast C (.c/.h) and C++ (.cc/.hh/.hxx) linter for EPITA coding style rules: AST-based checks via [tree-sitter](https://tree-sitter.github.io/), `clang-format` integration with language-specific configs, TOML/preset/CLI configuration, and pre-commit support.
 
 ## Installation
 
@@ -90,15 +81,7 @@ max_lines = 40
 "cast" = false          # Allow casts
 ```
 
-Or in `pyproject.toml`:
-
-```toml
-[tool.epita-coding-style]
-max_lines = 40
-
-[tool.epita-coding-style.rules]
-"keyword.goto" = false
-```
+The same keys work under `[tool.epita-coding-style]` in `pyproject.toml`.
 
 ### Limits
 
@@ -108,30 +91,6 @@ max_lines = 40
 | `max_args` | 4 | 4 | Max arguments per function |
 | `max_funcs` | 10 | n/a | Max exported functions per file (C only) |
 | `max_globals` | 1 | n/a | Max exported globals per file (C only) |
-
-## Rules Overview
-
-Use `epita-coding-style --list-rules` for the full list. Key categories:
-
-**C rules** (enabled by default):
-- **File**: line endings, trailing whitespace, blank lines at edges or consecutive, file termination
-- **Style**: Allman brace style
-- **Functions**: length, argument count, `(void)` for empty params
-- **Exports**: max exported functions/globals per `.c` file
-- **Preprocessor**: include guards, `#` column, `#endif` comments, digraphs, multi-line comment style
-- **Declarations**: one per line, no VLAs, no inline assembly, no comma operator outside `for`
-- **Control**: no empty loop bodies
-- **Strict**: no `goto`, no explicit casts
-- **Formatting**: clang-format compliance
-
-**C++ rules** (auto-enabled for .cc/.hh/.hxx files):
-- **File**: correct extensions (.cc/.hh/.hxx, not .cpp/.hpp)
-- **Preprocessor**: `#pragma once`, include order, no source includes, `constexpr`
-- **Global**: C++ casts, no malloc, `nullptr`, no `extern "C"`, C++ headers, `std::` functions
-- **Naming**: CamelCase classes/structs, lowercase namespaces with closing comments
-- **Declarations**: `&`/`*` next to type, `explicit` constructors, no VLAs
-- **Control**: switch default case, label padding, no empty loops
-- **Writing**: empty braces, single-expression braces, throw/catch rules, operator overloads, `enum class`, no `(void)` in empty param lists
 
 ## clang-format
 
@@ -159,7 +118,7 @@ works out of the box, e.g. Vim's `:make` with `makeprg=epita-coding-style\ %`.
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/KazeTachinuu/epita-coding-style
-    rev: v3.3.1
+    rev: v3.4.0
     hooks:
       - id: epita-coding-style
         args: [--preset, 42sh]  # optional
@@ -168,7 +127,3 @@ repos:
 Update the pinned `rev` with `pre-commit autoupdate`.
 
 With the tool already installed, `./setup-hooks.sh` sets up a local hook instead.
-
-## License
-
-MIT

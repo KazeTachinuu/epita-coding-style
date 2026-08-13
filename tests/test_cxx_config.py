@@ -155,17 +155,6 @@ def test_every_rule_has_a_category_slot():
         assert category in CATEGORY_ORDER, name
 
 
-def test_readme_rule_count_matches_registry():
-    import re
-    from pathlib import Path
-    from epita_coding_style.config import RULES
-
-    readme = Path(__file__).parent.parent / "README.md"
-    m = re.search(r"(\d+) rules across", readme.read_text())
-    assert m, "README rule-count sentence missing"
-    assert int(m.group(1)) == len(RULES)
-
-
 # config validation
 
 
