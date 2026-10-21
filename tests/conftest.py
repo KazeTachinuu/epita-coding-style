@@ -24,6 +24,7 @@ def _hermetic_cwd(tmp_path, monkeypatch):
 @pytest.fixture
 def cli(monkeypatch, capsys):
     """Run the CLI in-process with args (and optional stdin): returns code/out/err."""
+
     def _run(*args: str, stdin: str = "") -> CliResult:
         monkeypatch.setattr(sys, "argv", ["epita-coding-style", *args])
         monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
@@ -33,22 +34,27 @@ def cli(monkeypatch, capsys):
             code = e.code
         out, err = capsys.readouterr()
         return CliResult(code, out, err)
+
     return _run
 
 
 @pytest.fixture
 def lint(tmp_path):
     """Lint a code string as tmp_path/test<suffix>: returns its violations."""
+
     def _lint(code: str, suffix: str = ".c", preset: str | None = None) -> list[Violation]:
         path = tmp_path / f"test{suffix}"
         path.write_bytes(code.encode())
         return check_file(str(path), load_config(preset=preset))
+
     return _lint
 
 
 @pytest.fixture
 def rules(lint):
     """Lint a code string: returns the names of the rules it violates."""
+
     def _rules(code: str, suffix: str = ".c", preset: str | None = None) -> set[str]:
         return {v.rule for v in lint(code, suffix, preset)}
+
     return _rules

@@ -11,11 +11,15 @@ EMPTY_BODY_SAME_LINE = "void foo() {}\n"
 EMPTY_BODY_SPACE = "void foo() { }\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (EMPTY_BODY_SAME_LINE, False),
-    (EMPTY_BODY_MULTILINE, True),
-    (EMPTY_BODY_SPACE, True),
-], ids=["same-line-ok", "multiline-bad", "space-inside-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (EMPTY_BODY_SAME_LINE, False),
+        (EMPTY_BODY_MULTILINE, True),
+        (EMPTY_BODY_SPACE, True),
+    ],
+    ids=["same-line-ok", "multiline-bad", "space-inside-bad"],
+)
 def test_braces_empty(rules, code, should_fail):
     assert ("braces.empty" in rules(code, ".cc")) == should_fail
 
@@ -87,16 +91,25 @@ DO_WITH_BRACES = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (IF_WITH_BRACES, False),
-    (IF_WITHOUT_BRACES, True),
-    (ELSE_WITH_BRACES, False),
-    (ELSE_WITHOUT_BRACES, True),
-    (DO_WITH_BRACES, False),
-    (DO_WITHOUT_BRACES, True),
-], ids=["if-with-braces-ok", "if-without-braces-bad",
-        "else-with-braces-ok", "else-without-braces-bad",
-        "do-with-braces-ok", "do-without-braces-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (IF_WITH_BRACES, False),
+        (IF_WITHOUT_BRACES, True),
+        (ELSE_WITH_BRACES, False),
+        (ELSE_WITHOUT_BRACES, True),
+        (DO_WITH_BRACES, False),
+        (DO_WITHOUT_BRACES, True),
+    ],
+    ids=[
+        "if-with-braces-ok",
+        "if-without-braces-bad",
+        "else-with-braces-ok",
+        "else-without-braces-bad",
+        "do-with-braces-ok",
+        "do-without-braces-bad",
+    ],
+)
 def test_braces_single_exp(rules, code, should_fail):
     assert ("braces.single_exp" in rules(code, ".cc")) == should_fail
 
@@ -109,12 +122,16 @@ THROW_EXCEPTION = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("
 THROW_NEW = '#include <stdexcept>\nvoid foo() { throw new std::runtime_error("err"); }\n'
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (THROW_EXCEPTION, False),
-    (THROW_INTEGER, True),
-    (THROW_STRING, True),
-    (THROW_NEW, True),
-], ids=["exception-ok", "integer-bad", "string-bad", "throw-new-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (THROW_EXCEPTION, False),
+        (THROW_INTEGER, True),
+        (THROW_STRING, True),
+        (THROW_NEW, True),
+    ],
+    ids=["exception-ok", "integer-bad", "string-bad", "throw-new-bad"],
+)
 def test_err_throw(rules, code, should_fail):
     assert ("err.throw" in rules(code, ".cc")) == should_fail
 
@@ -146,11 +163,15 @@ CATCH_ELLIPSIS = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (CATCH_BY_REF, False),
-    (CATCH_ELLIPSIS, False),
-    (CATCH_BY_VALUE, True),
-], ids=["by-ref-ok", "ellipsis-ok", "by-value-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (CATCH_BY_REF, False),
+        (CATCH_ELLIPSIS, False),
+        (CATCH_BY_VALUE, True),
+    ],
+    ids=["by-ref-ok", "ellipsis-ok", "by-value-bad"],
+)
 def test_err_throw_catch(rules, code, should_fail):
     assert ("err.throw.catch" in rules(code, ".cc")) == should_fail
 
@@ -161,10 +182,14 @@ THROW_WITH_PARENS = '#include <stdexcept>\nvoid foo() { throw(std::runtime_error
 THROW_WITHOUT_PARENS = '#include <stdexcept>\nvoid foo() { throw std::runtime_error("err"); }\n'
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (THROW_WITHOUT_PARENS, False),
-    (THROW_WITH_PARENS, True),
-], ids=["no-parens-ok", "parens-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (THROW_WITHOUT_PARENS, False),
+        (THROW_WITH_PARENS, True),
+    ],
+    ids=["no-parens-ok", "parens-bad"],
+)
 def test_err_throw_paren(rules, code, should_fail):
     assert ("err.throw.paren" in rules(code, ".cc")) == should_fail
 
@@ -200,12 +225,16 @@ OPERATOR_CAST_INT = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (OPERATOR_NO_SPACE, False),
-    (OPERATOR_WITH_SPACE, True),
-    (OPERATOR_CAST_BOOL, False),
-    (OPERATOR_CAST_INT, False),
-], ids=["no-space-ok", "space-bad", "cast-bool-ok", "cast-int-ok"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (OPERATOR_NO_SPACE, False),
+        (OPERATOR_WITH_SPACE, True),
+        (OPERATOR_CAST_BOOL, False),
+        (OPERATOR_CAST_INT, False),
+    ],
+    ids=["no-space-ok", "space-bad", "cast-bool-ok", "cast-int-ok"],
+)
 def test_exp_padding(rules, code, should_fail):
     assert ("exp.padding" in rules(code, ".cc")) == should_fail
 
@@ -217,11 +246,15 @@ EMPTY_PARAMS = "void foo() {}\n"
 VOID_IN_DECL = "void foo(void);\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (EMPTY_PARAMS, False),
-    (VOID_PARAMS, True),
-    (VOID_IN_DECL, True),
-], ids=["empty-params-ok", "void-params-bad", "void-in-decl-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (EMPTY_PARAMS, False),
+        (VOID_PARAMS, True),
+        (VOID_IN_DECL, True),
+    ],
+    ids=["empty-params-ok", "void-params-bad", "void-in-decl-bad"],
+)
 def test_fun_proto_void_cxx(rules, code, should_fail):
     assert ("fun.proto.void.cxx" in rules(code, ".cc")) == should_fail
 
@@ -264,14 +297,23 @@ ASSIGN_COMPOUND_NOT_ASSIGN = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (ASSIGN_CORRECT, False),
-    (ASSIGN_NO_REF_RETURN, True),
-    (ASSIGN_MISSING_THIS, True),
-    (ASSIGN_EQUALITY_NOT_ASSIGN, False),
-    (ASSIGN_COMPOUND_NOT_ASSIGN, False),
-], ids=["correct-ok", "no-ref-return-bad", "missing-this-bad",
-        "equality-not-assign-ok", "compound-not-assign-ok"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (ASSIGN_CORRECT, False),
+        (ASSIGN_NO_REF_RETURN, True),
+        (ASSIGN_MISSING_THIS, True),
+        (ASSIGN_EQUALITY_NOT_ASSIGN, False),
+        (ASSIGN_COMPOUND_NOT_ASSIGN, False),
+    ],
+    ids=[
+        "correct-ok",
+        "no-ref-return-bad",
+        "missing-this-bad",
+        "equality-not-assign-ok",
+        "compound-not-assign-ok",
+    ],
+)
 def test_op_assign(rules, code, should_fail):
     assert ("op.assign" in rules(code, ".cc")) == should_fail
 
@@ -307,12 +349,16 @@ OVERLOAD_PLUS = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (OVERLOAD_PLUS, False),
-    (OVERLOAD_COMMA, True),
-    (OVERLOAD_LOGICAL_OR, True),
-    (OVERLOAD_LOGICAL_AND, True),
-], ids=["plus-ok", "comma-bad", "logical-or-bad", "logical-and-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (OVERLOAD_PLUS, False),
+        (OVERLOAD_COMMA, True),
+        (OVERLOAD_LOGICAL_OR, True),
+        (OVERLOAD_LOGICAL_AND, True),
+    ],
+    ids=["plus-ok", "comma-bad", "logical-or-bad", "logical-and-bad"],
+)
 def test_op_overload(rules, code, should_fail):
     assert ("op.overload" in rules(code, ".cc")) == should_fail
 
@@ -337,10 +383,14 @@ PLAIN_ENUM = "enum Color { Red, Green, Blue };\n"
 ENUM_CLASS = "enum class Color { Red, Green, Blue };\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (ENUM_CLASS, False),
-    (PLAIN_ENUM, True),
-], ids=["enum-class-ok", "plain-enum-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (ENUM_CLASS, False),
+        (PLAIN_ENUM, True),
+    ],
+    ids=["enum-class-ok", "plain-enum-bad"],
+)
 def test_enum_class(rules, code, should_fail):
     assert ("enum.class" in rules(code, ".cc")) == should_fail
 
@@ -411,37 +461,45 @@ REAL_BINARY_OP_AT_EOL = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (OPERATOR_START_OF_NEXT, False),
-    (OPERATOR_END_OF_LINE, True),
-    (TEMPLATE_CLOSING_ANGLE, False),
-    (TEMPLATE_FUNCTION, False),
-    (REFERENCE_RETURN_TYPE, False),
-    (REFERENCE_PARAM, False),
-    (NESTED_TEMPLATE, False),
-    (POINTER_RETURN_TYPE, False),
-    (REAL_BINARY_OP_AT_EOL, True),
-], ids=[
-    "start-of-next-ok",
-    "end-of-line-bad",
-    "template-closing-angle-ok",
-    "template-function-ok",
-    "reference-return-type-ok",
-    "reference-param-ok",
-    "nested-template-ok",
-    "pointer-return-type-ok",
-    "real-binary-op-at-eol-bad",
-])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (OPERATOR_START_OF_NEXT, False),
+        (OPERATOR_END_OF_LINE, True),
+        (TEMPLATE_CLOSING_ANGLE, False),
+        (TEMPLATE_FUNCTION, False),
+        (REFERENCE_RETURN_TYPE, False),
+        (REFERENCE_PARAM, False),
+        (NESTED_TEMPLATE, False),
+        (POINTER_RETURN_TYPE, False),
+        (REAL_BINARY_OP_AT_EOL, True),
+    ],
+    ids=[
+        "start-of-next-ok",
+        "end-of-line-bad",
+        "template-closing-angle-ok",
+        "template-function-ok",
+        "reference-return-type-ok",
+        "reference-param-ok",
+        "nested-template-ok",
+        "pointer-return-type-ok",
+        "real-binary-op-at-eol-bad",
+    ],
+)
 def test_exp_linebreak(rules, code, should_fail):
     assert ("exp.linebreak" in rules(code, ".cc")) == should_fail
 
 
-@pytest.mark.parametrize("code,rule", [
-    ("int f()\n<%\n    return 0;\n%>\n", "cpp.digraphs"),
-    ("void f()\n{\n    int a, b;\n}\n", "decl.single"),
-    ("  #pragma once\nint g;\n", "cpp.mark"),
-    ("int f(int a, int b, int c, int d, int e)\n{\n    return a;\n}\n", "fun.arg.count"),
-], ids=["digraphs", "decl-single", "cpp-mark", "arg-count"])
+@pytest.mark.parametrize(
+    "code,rule",
+    [
+        ("int f()\n<%\n    return 0;\n%>\n", "cpp.digraphs"),
+        ("void f()\n{\n    int a, b;\n}\n", "decl.single"),
+        ("  #pragma once\nint g;\n", "cpp.mark"),
+        ("int f(int a, int b, int c, int d, int e)\n{\n    return a;\n}\n", "fun.arg.count"),
+    ],
+    ids=["digraphs", "decl-single", "cpp-mark", "arg-count"],
+)
 def test_shared_rules_run_on_cxx(rules, code, rule):
     assert rule in rules(code, ".cc")
 
@@ -451,33 +509,65 @@ def test_fun_length_runs_on_cxx(rules):
     assert "fun.length" in rules(f"int f()\n{{\n{body}\n    return 0;\n}}\n", ".cc")
 
 
-@pytest.mark.parametrize("code,rule,should_fail", [
-    ("void f()\n{\n    throw;\n}\n", "err.throw.paren", False),
-    ("void f(int a, int b)\n{\n    throw (a + b);\n}\n", "err.throw.paren", True),
-    ("void foo(void* p);\n", "fun.proto.void.cxx", False),
-    ("class Foo;\nbool operator&&(const Foo& a, const Foo& b);\n", "op.overload", True),
-    ("class Foo\n{\npublic:\n    Foo& operator&=(const Foo& o);\n};\n", "op.overload.binand", False),
-    ("class Foo\n{\npublic:\n    bool operator&&(const Foo& o);\n};\n", "op.overload.binand", False),
-    ("enum struct Color\n{\n    red,\n};\n", "enum.class", False),
-    ("enum\n{\n    kA,\n};\n", "enum.class", True),
-], ids=["bare-rethrow", "paren-expr-throw", "void-ptr-param", "free-fn-overload",
-        "binand-assign-ok", "binand-not-logical-and", "enum-struct-ok", "anonymous-enum"])
+@pytest.mark.parametrize(
+    "code,rule,should_fail",
+    [
+        ("void f()\n{\n    throw;\n}\n", "err.throw.paren", False),
+        ("void f(int a, int b)\n{\n    throw (a + b);\n}\n", "err.throw.paren", True),
+        ("void foo(void* p);\n", "fun.proto.void.cxx", False),
+        ("class Foo;\nbool operator&&(const Foo& a, const Foo& b);\n", "op.overload", True),
+        (
+            "class Foo\n{\npublic:\n    Foo& operator&=(const Foo& o);\n};\n",
+            "op.overload.binand",
+            False,
+        ),
+        (
+            "class Foo\n{\npublic:\n    bool operator&&(const Foo& o);\n};\n",
+            "op.overload.binand",
+            False,
+        ),
+        ("enum struct Color\n{\n    red,\n};\n", "enum.class", False),
+        ("enum\n{\n    kA,\n};\n", "enum.class", True),
+    ],
+    ids=[
+        "bare-rethrow",
+        "paren-expr-throw",
+        "void-ptr-param",
+        "free-fn-overload",
+        "binand-assign-ok",
+        "binand-not-logical-and",
+        "enum-struct-ok",
+        "anonymous-enum",
+    ],
+)
 def test_cxx_writing_edges(rules, code, rule, should_fail):
     assert (rule in rules(code, ".cc")) == should_fail
 
 
-@pytest.mark.parametrize("code,rule,should_fail", [
-    ("int f(int y)\n{\n    int x = y; // sum +\n    return x;\n}\n", "exp.linebreak", False),
-    ("void f(int b)\n{\n    int x = 0; // a &b\n    x = b;\n}\n", "decl.ref", False),
-], ids=["op-in-trailing-comment", "ref-in-trailing-comment"])
+@pytest.mark.parametrize(
+    "code,rule,should_fail",
+    [
+        ("int f(int y)\n{\n    int x = y; // sum +\n    return x;\n}\n", "exp.linebreak", False),
+        ("void f(int b)\n{\n    int x = 0; // a &b\n    x = b;\n}\n", "decl.ref", False),
+    ],
+    ids=["op-in-trailing-comment", "ref-in-trailing-comment"],
+)
 def test_comment_blindness_edges(rules, code, rule, should_fail):
     assert (rule in rules(code, ".cc")) == should_fail
 
 
-@pytest.mark.parametrize("code,rule,should_fail", [
-    ("/* start\nint x = y +\n   end */\nint g = 0;\n", "exp.linebreak", False),
-    ("/* start\nint &x = y;\n   end */\nint g = 0;\n", "decl.ref", False),
-    ('int f(const char *s);\nint g(int y)\n{\n    int x = f("http://x") +\n        y;\n    return x;\n}\n', "exp.linebreak", True),
-], ids=["op-inside-block-comment", "ref-inside-block-comment", "url-string-kept"])
+@pytest.mark.parametrize(
+    "code,rule,should_fail",
+    [
+        ("/* start\nint x = y +\n   end */\nint g = 0;\n", "exp.linebreak", False),
+        ("/* start\nint &x = y;\n   end */\nint g = 0;\n", "decl.ref", False),
+        (
+            'int f(const char *s);\nint g(int y)\n{\n    int x = f("http://x") +\n        y;\n    return x;\n}\n',
+            "exp.linebreak",
+            True,
+        ),
+    ],
+    ids=["op-inside-block-comment", "ref-inside-block-comment", "url-string-kept"],
+)
 def test_comment_scrub_edges(rules, code, rule, should_fail):
     assert (rule in rules(code, ".cc")) == should_fail

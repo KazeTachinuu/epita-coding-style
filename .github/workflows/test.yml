@@ -23,6 +23,9 @@ jobs:
       - name: Ruff
         run: uvx ruff check
 
+      - name: Ruff format
+        run: uvx ruff format --check
+
       - name: Type check
         run: uv run mypy
 

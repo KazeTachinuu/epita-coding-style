@@ -11,11 +11,15 @@ HEADER_WITH_PRAGMA = "#pragma once\nint x;\n"
 SOURCE_NO_PRAGMA = "int x;\n"
 
 
-@pytest.mark.parametrize("code,suffix,should_fail", [
-    (HEADER_WITH_PRAGMA, ".hh", False),
-    (SOURCE_NO_PRAGMA, ".cc", False),
-    (HEADER_WITH_GUARD, ".hh", True),
-], ids=["pragma-once-ok", "source-file-ok", "guard-instead-of-pragma"])
+@pytest.mark.parametrize(
+    "code,suffix,should_fail",
+    [
+        (HEADER_WITH_PRAGMA, ".hh", False),
+        (SOURCE_NO_PRAGMA, ".cc", False),
+        (HEADER_WITH_GUARD, ".hh", True),
+    ],
+    ids=["pragma-once-ok", "source-file-ok", "guard-instead-of-pragma"],
+)
 def test_cpp_pragma_once(rules, code, suffix, should_fail):
     assert ("cpp.pragma.once" in rules(code, suffix)) == should_fail
 
@@ -30,15 +34,25 @@ INCLUDE_HEADER_H = '#include "foo.h"\nint x;\n'
 INCLUDE_SYSTEM = "#include <iostream>\nint x;\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (INCLUDE_HEADER_HH, False),
-    (INCLUDE_HEADER_HXX, False),
-    (INCLUDE_SYSTEM, False),
-    (INCLUDE_SOURCE_CC, True),
-    (INCLUDE_SOURCE_C, True),
-    (INCLUDE_HEADER_H, True),
-], ids=["header-hh-ok", "header-hxx-ok", "system-ok",
-        "source-cc-bad", "source-c-bad", "header-h-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (INCLUDE_HEADER_HH, False),
+        (INCLUDE_HEADER_HXX, False),
+        (INCLUDE_SYSTEM, False),
+        (INCLUDE_SOURCE_CC, True),
+        (INCLUDE_SOURCE_C, True),
+        (INCLUDE_HEADER_H, True),
+    ],
+    ids=[
+        "header-hh-ok",
+        "header-hxx-ok",
+        "system-ok",
+        "source-cc-bad",
+        "source-c-bad",
+        "header-h-bad",
+    ],
+)
 def test_cpp_include_filetype(rules, code, should_fail):
     assert ("cpp.include.filetype" in rules(code, ".cc")) == should_fail
 
@@ -46,16 +60,22 @@ def test_cpp_include_filetype(rules, code, should_fail):
 # cpp.include.order
 
 # test.cc: same-name header first, then system, then local (with blank lines between groups)
-INCLUDE_ORDER_CORRECT = '#include "test.hh"\n\n#include <iostream>\n\n#include "other.hh"\n\nint x;\n'
+INCLUDE_ORDER_CORRECT = (
+    '#include "test.hh"\n\n#include <iostream>\n\n#include "other.hh"\n\nint x;\n'
+)
 INCLUDE_SYSTEM_BEFORE_SELF = '#include <iostream>\n\n#include "test.hh"\n\nint x;\n'
 INCLUDE_LOCAL_BEFORE_SYSTEM = '#include "other.hh"\n\n#include <iostream>\n\nint x;\n'
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (INCLUDE_ORDER_CORRECT, False),
-    (INCLUDE_SYSTEM_BEFORE_SELF, True),
-    (INCLUDE_LOCAL_BEFORE_SYSTEM, True),
-], ids=["correct-order", "system-before-self", "local-before-system"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (INCLUDE_ORDER_CORRECT, False),
+        (INCLUDE_SYSTEM_BEFORE_SELF, True),
+        (INCLUDE_LOCAL_BEFORE_SYSTEM, True),
+    ],
+    ids=["correct-order", "system-before-self", "local-before-system"],
+)
 def test_cpp_include_order(rules, code, should_fail):
     assert ("cpp.include.order" in rules(code, ".cc")) == should_fail
 
@@ -70,14 +90,20 @@ def test_cpp_include_order_hh_hxx_at_end(rules):
 
 # cpp.include.order (alphabetical)
 
-INCLUDES_ALPHA_OK = '#include <algorithm>\n#include <vector>\n\n#include "bar.hh"\n#include "foo.hh"\n\nint x;\n'
-INCLUDES_ALPHA_BAD = '#include <vector>\n#include <algorithm>\nint x;\n'
+INCLUDES_ALPHA_OK = (
+    '#include <algorithm>\n#include <vector>\n\n#include "bar.hh"\n#include "foo.hh"\n\nint x;\n'
+)
+INCLUDES_ALPHA_BAD = "#include <vector>\n#include <algorithm>\nint x;\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (INCLUDES_ALPHA_OK, False),
-    (INCLUDES_ALPHA_BAD, True),
-], ids=["alphabetical-ok", "alphabetical-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (INCLUDES_ALPHA_OK, False),
+        (INCLUDES_ALPHA_BAD, True),
+    ],
+    ids=["alphabetical-ok", "alphabetical-bad"],
+)
 def test_cpp_include_order_alphabetical(rules, code, should_fail):
     assert ("cpp.include.order" in rules(code, ".cc")) == should_fail
 
@@ -99,8 +125,12 @@ INCLUDES_NO_BLANK_LINE = '#include "test.hh"\n#include <iostream>\n#include "oth
 
 def test_cpp_include_order_blank_line(lint):
     def blank_line(code):
-        return [v for v in lint(code, ".cc")
-                if v.rule == "cpp.include.order" and "blank line" in v.message]
+        return [
+            v
+            for v in lint(code, ".cc")
+            if v.rule == "cpp.include.order" and "blank line" in v.message
+        ]
+
     assert blank_line(INCLUDES_BLANK_LINE_OK) == []
     assert blank_line(INCLUDES_NO_BLANK_LINE)
 
@@ -111,10 +141,14 @@ CONST_LITERAL = "const int x = 42;\nint main() { return 0; }\n"
 CONSTEXPR_LITERAL = "constexpr int x = 42;\nint main() { return 0; }\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (CONSTEXPR_LITERAL, False),
-    (CONST_LITERAL, True),
-], ids=["constexpr-ok", "const-should-be-constexpr"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (CONSTEXPR_LITERAL, False),
+        (CONST_LITERAL, True),
+    ],
+    ids=["constexpr-ok", "const-should-be-constexpr"],
+)
 def test_cpp_constexpr(rules, code, should_fail):
     assert ("cpp.constexpr" in rules(code, ".cc")) == should_fail
 

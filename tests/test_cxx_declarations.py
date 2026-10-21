@@ -10,10 +10,14 @@ REF_NEXT_TO_VAR = "void foo(int &x) {}\n"
 REF_NEXT_TO_TYPE = "void foo(int& x) {}\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (REF_NEXT_TO_TYPE, False),
-    (REF_NEXT_TO_VAR, True),
-], ids=["ref-left-ok", "ref-right-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (REF_NEXT_TO_TYPE, False),
+        (REF_NEXT_TO_VAR, True),
+    ],
+    ids=["ref-left-ok", "ref-right-bad"],
+)
 def test_decl_ref(rules, code, should_fail):
     assert ("decl.ref" in rules(code, ".cc")) == should_fail
 
@@ -24,10 +28,14 @@ PTR_NEXT_TO_VAR = "void foo(int *x) {}\n"
 PTR_NEXT_TO_TYPE = "void foo(int* x) {}\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (PTR_NEXT_TO_TYPE, False),
-    (PTR_NEXT_TO_VAR, True),
-], ids=["ptr-left-ok", "ptr-right-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (PTR_NEXT_TO_TYPE, False),
+        (PTR_NEXT_TO_VAR, True),
+    ],
+    ids=["ptr-left-ok", "ptr-right-bad"],
+)
 def test_decl_point(rules, code, should_fail):
     assert ("decl.point" in rules(code, ".cc")) == should_fail
 
@@ -93,17 +101,29 @@ CTOR_MOVE_TEMPLATE = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (CTOR_SINGLE_EXPLICIT, False),
-    (CTOR_MULTI_ARG, False),
-    (CTOR_ZERO_ARG, False),
-    (CTOR_COPY, False),
-    (CTOR_MOVE, False),
-    (CTOR_COPY_TEMPLATE, False),
-    (CTOR_MOVE_TEMPLATE, False),
-    (CTOR_SINGLE_NOT_EXPLICIT, True),
-], ids=["explicit-ok", "multi-arg-ok", "zero-arg-ok", "copy-ctor-ok", "move-ctor-ok",
-        "copy-ctor-template-ok", "move-ctor-template-ok", "single-not-explicit"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (CTOR_SINGLE_EXPLICIT, False),
+        (CTOR_MULTI_ARG, False),
+        (CTOR_ZERO_ARG, False),
+        (CTOR_COPY, False),
+        (CTOR_MOVE, False),
+        (CTOR_COPY_TEMPLATE, False),
+        (CTOR_MOVE_TEMPLATE, False),
+        (CTOR_SINGLE_NOT_EXPLICIT, True),
+    ],
+    ids=[
+        "explicit-ok",
+        "multi-arg-ok",
+        "zero-arg-ok",
+        "copy-ctor-ok",
+        "move-ctor-ok",
+        "copy-ctor-template-ok",
+        "move-ctor-template-ok",
+        "single-not-explicit",
+    ],
+)
 def test_decl_ctor_explicit(rules, code, should_fail):
     assert ("decl.ctor.explicit" in rules(code, ".cc")) == should_fail
 
@@ -114,18 +134,26 @@ VLA_DETECTED = "void foo(int n) { int arr[n]; }\n"
 FIXED_ARRAY = "void foo() { int arr[10]; }\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (FIXED_ARRAY, False),
-    (VLA_DETECTED, True),
-], ids=["fixed-array-ok", "vla-detected"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (FIXED_ARRAY, False),
+        (VLA_DETECTED, True),
+    ],
+    ids=["fixed-array-ok", "vla-detected"],
+)
 def test_decl_vla(rules, code, should_fail):
     assert ("decl.vla" in rules(code, ".cc")) == should_fail
 
 
-@pytest.mark.parametrize("code,rule,should_fail", [
-    ("void f(int a, int b)\n{\n    int c = a & b;\n}\n", "decl.ref", False),
-    ("class Foo\n{\npublic:\n    Foo(Foo&& o);\n};\n", "decl.ref", False),
-    ("void f(int a, int b)\n{\n    int c = a * b;\n}\n", "decl.point", False),
-], ids=["bitwise-and", "rvalue-ref", "multiplication"])
+@pytest.mark.parametrize(
+    "code,rule,should_fail",
+    [
+        ("void f(int a, int b)\n{\n    int c = a & b;\n}\n", "decl.ref", False),
+        ("class Foo\n{\npublic:\n    Foo(Foo&& o);\n};\n", "decl.ref", False),
+        ("void f(int a, int b)\n{\n    int c = a * b;\n}\n", "decl.point", False),
+    ],
+    ids=["bitwise-and", "rvalue-ref", "multiplication"],
+)
 def test_ref_pointer_edges(rules, code, rule, should_fail):
     assert (rule in rules(code, ".cc")) == should_fail

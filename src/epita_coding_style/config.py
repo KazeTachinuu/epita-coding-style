@@ -43,13 +43,21 @@ RULES: dict[str, tuple[str, str, str]] = {
     "format": ("clang-format compliance check", "Formatting", "both"),
     "file.ext": ("C++ files must use .cc/.hh/.hxx extensions (not .cpp/.hpp)", "CXX-File", "cxx"),
     "cpp.pragma.once": ("Use #pragma once instead of include guards", "CXX-Preprocessor", "cxx"),
-    "cpp.include.filetype": ("Only include .hh/.hxx files (no source files)", "CXX-Preprocessor", "cxx"),
-    "cpp.include.order": ("Includes ordered: same-name header, system, local", "CXX-Preprocessor", "cxx"),
+    "cpp.include.filetype": (
+        "Only include .hh/.hxx files (no source files)",
+        "CXX-Preprocessor",
+        "cxx",
+    ),
+    "cpp.include.order": (
+        "Includes ordered: same-name header, system, local",
+        "CXX-Preprocessor",
+        "cxx",
+    ),
     "cpp.constexpr": ("Compile-time constants should use constexpr", "CXX-Preprocessor", "cxx"),
     "global.casts": ("Must use C++ casts (static_cast etc.), not C-style", "CXX-Global", "cxx"),
     "global.memory.no_malloc": ("No malloc/calloc/realloc/free", "CXX-Global", "cxx"),
     "global.nullptr": ("Use nullptr, not NULL", "CXX-Global", "cxx"),
-    "c.extern": ("No extern \"C\"", "CXX-Global", "cxx"),
+    "c.extern": ('No extern "C"', "CXX-Global", "cxx"),
     "c.headers": ("No C headers (use <cstdio> not <stdio.h>)", "CXX-Global", "cxx"),
     "c.std_functions": ("Use std:: equivalents", "CXX-Global", "cxx"),
     "naming.class": ("CamelCase class/struct names", "CXX-Naming", "cxx"),
@@ -64,7 +72,11 @@ RULES: dict[str, tuple[str, str, str]] = {
     "err.throw": ("Don't throw literals", "CXX-Writing", "cxx"),
     "err.throw.catch": ("Catch by reference", "CXX-Writing", "cxx"),
     "err.throw.paren": ("No parentheses after throw", "CXX-Writing", "cxx"),
-    "exp.padding": ("No space in operator keyword (operator++ not operator ++)", "CXX-Writing", "cxx"),
+    "exp.padding": (
+        "No space in operator keyword (operator++ not operator ++)",
+        "CXX-Writing",
+        "cxx",
+    ),
     "exp.linebreak": ("Line breaks before binary operators", "CXX-Writing", "cxx"),
     "fun.proto.void.cxx": ("MUST NOT use void in C++ empty params", "CXX-Writing", "cxx"),
     "op.assign": ("Return Class& and *this from assignment operators", "CXX-Writing", "cxx"),
@@ -102,9 +114,9 @@ class Config:
     user_rules: set[str] = field(default_factory=set)
     user_limits: set[str] = field(default_factory=set)
 
-    rules: dict[str, bool] = field(default_factory=lambda: {
-        name: lang != "cxx" for name, (_, _, lang) in RULES.items()
-    })
+    rules: dict[str, bool] = field(
+        default_factory=lambda: {name: lang != "cxx" for name, (_, _, lang) in RULES.items()}
+    )
 
     def is_enabled(self, rule: str) -> bool:
         return self.rules.get(rule, True)
@@ -117,9 +129,13 @@ class Config:
         for rule in _C_ONLY_RULES - self.user_rules:
             rules[rule] = False
         max_lines = self.max_lines if "max_lines" in self.user_limits else 50
-        return replace(self, rules=rules, max_lines=max_lines,
-                       user_rules=set(self.user_rules),
-                       user_limits=set(self.user_limits))
+        return replace(
+            self,
+            rules=rules,
+            max_lines=max_lines,
+            user_rules=set(self.user_rules),
+            user_limits=set(self.user_limits),
+        )
 
 
 # Presets (override defaults)
@@ -193,8 +209,7 @@ def _load_toml(path: Path) -> dict[str, Any]:
 
 def _preset(name: Any, source: str) -> dict[str, Any]:
     if name not in PRESETS:
-        raise ConfigError(f"{source}: unknown preset '{name}' "
-                          f"(choose from: {', '.join(PRESETS)})")
+        raise ConfigError(f"{source}: unknown preset '{name}' (choose from: {', '.join(PRESETS)})")
     return PRESETS[name]
 
 
@@ -208,8 +223,7 @@ def _apply_dict(cfg: Config, data: dict[str, Any], source: str) -> None:
                 raise ConfigError(f"{source}: [rules] must be a table")
             for rule, enabled in val.items():
                 if rule not in RULES:
-                    raise ConfigError(f"{source}: unknown rule '{rule}' "
-                                      f"(see --list-rules)")
+                    raise ConfigError(f"{source}: unknown rule '{rule}' (see --list-rules)")
                 if not isinstance(enabled, bool):
                     raise ConfigError(f"{source}: rule '{rule}' must be true or false")
             cfg.rules.update(val)

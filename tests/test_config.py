@@ -78,11 +78,15 @@ def test_config_found_from_subdirectory(tmp_path, monkeypatch):
 
 # --show-config output is a loadable config
 
-@pytest.mark.parametrize("args", [
-    [],
-    ["--preset", "42sh"],
-    ["--preset", "ppex1", "--max-lines", "12", "--max-casts", "3"],
-])
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        [],
+        ["--preset", "42sh"],
+        ["--preset", "ppex1", "--max-lines", "12", "--max-casts", "3"],
+    ],
+)
 def test_show_config_round_trips(cli, tmp_path, args):
     shown = cli("--no-color", *args, "--show-config").out
     (tmp_path / ".epita-style.toml").write_text(shown)

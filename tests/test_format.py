@@ -10,8 +10,7 @@ from epita_coding_style.checks.clang_format import check_clang_format
 
 # Skip all tests if clang-format not installed
 pytestmark = pytest.mark.skipif(
-    not shutil.which("clang-format"),
-    reason="clang-format not installed"
+    not shutil.which("clang-format"), reason="clang-format not installed"
 )
 
 
@@ -77,12 +76,16 @@ void foo(void)
 """
 
 
-@pytest.mark.parametrize("code,suffix", [
-    (C_GOOD_MAIN, ".c"),
-    (C_GOOD_POINTER_RIGHT, ".c"),
-    (C_GOOD_HEADER, ".h"),
-    (C_GOOD_ALLMAN, ".c"),
-], ids=["main", "pointer-right", "header", "allman-braces"])
+@pytest.mark.parametrize(
+    "code,suffix",
+    [
+        (C_GOOD_MAIN, ".c"),
+        (C_GOOD_POINTER_RIGHT, ".c"),
+        (C_GOOD_HEADER, ".h"),
+        (C_GOOD_ALLMAN, ".c"),
+    ],
+    ids=["main", "pointer-right", "header", "allman-braces"],
+)
 def test_c_format_pass(rules, code, suffix):
     """C: well-formatted code should pass."""
     assert "format" not in rules(code, suffix)
@@ -125,12 +128,16 @@ void foo(void)
 """
 
 
-@pytest.mark.parametrize("code,suffix", [
-    (C_BAD_KR_BRACES, ".c"),
-    (C_BAD_POINTER_LEFT, ".c"),
-    (C_BAD_HEADER, ".h"),
-    (C_BAD_MISSING_SPACES, ".c"),
-], ids=["kr-braces", "pointer-left", "header", "missing-spaces"])
+@pytest.mark.parametrize(
+    "code,suffix",
+    [
+        (C_BAD_KR_BRACES, ".c"),
+        (C_BAD_POINTER_LEFT, ".c"),
+        (C_BAD_HEADER, ".h"),
+        (C_BAD_MISSING_SPACES, ".c"),
+    ],
+    ids=["kr-braces", "pointer-left", "header", "missing-spaces"],
+)
 def test_c_format_fail(rules, code, suffix):
     """C: badly formatted code should fail."""
     assert "format" in rules(code, suffix)
@@ -202,14 +209,18 @@ void foo()
 """
 
 
-@pytest.mark.parametrize("code,suffix", [
-    (CXX_GOOD_MAIN, ".cc"),
-    (CXX_GOOD_POINTER_LEFT, ".cc"),
-    (CXX_GOOD_REFERENCE_LEFT, ".cc"),
-    (CXX_GOOD_HH_HEADER, ".hh"),
-    (CXX_GOOD_HXX_HEADER, ".hxx"),
-    (CXX_GOOD_ALLMAN, ".cc"),
-], ids=["main", "pointer-left", "reference-left", "hh-header", "hxx-header", "allman-braces"])
+@pytest.mark.parametrize(
+    "code,suffix",
+    [
+        (CXX_GOOD_MAIN, ".cc"),
+        (CXX_GOOD_POINTER_LEFT, ".cc"),
+        (CXX_GOOD_REFERENCE_LEFT, ".cc"),
+        (CXX_GOOD_HH_HEADER, ".hh"),
+        (CXX_GOOD_HXX_HEADER, ".hxx"),
+        (CXX_GOOD_ALLMAN, ".cc"),
+    ],
+    ids=["main", "pointer-left", "reference-left", "hh-header", "hxx-header", "allman-braces"],
+)
 def test_cxx_format_pass(rules, code, suffix):
     """C++: well-formatted code should pass."""
     assert "format" not in rules(code, suffix)
@@ -259,13 +270,17 @@ void foo()
 """
 
 
-@pytest.mark.parametrize("code,suffix", [
-    (CXX_BAD_KR_BRACES, ".cc"),
-    (CXX_BAD_POINTER_RIGHT, ".cc"),
-    (CXX_BAD_REFERENCE_RIGHT, ".cc"),
-    (CXX_BAD_HH_HEADER, ".hh"),
-    (CXX_BAD_MISSING_SPACES, ".cc"),
-], ids=["kr-braces", "pointer-right", "reference-right", "hh-header", "missing-spaces"])
+@pytest.mark.parametrize(
+    "code,suffix",
+    [
+        (CXX_BAD_KR_BRACES, ".cc"),
+        (CXX_BAD_POINTER_RIGHT, ".cc"),
+        (CXX_BAD_REFERENCE_RIGHT, ".cc"),
+        (CXX_BAD_HH_HEADER, ".hh"),
+        (CXX_BAD_MISSING_SPACES, ".cc"),
+    ],
+    ids=["kr-braces", "pointer-right", "reference-right", "hh-header", "missing-spaces"],
+)
 def test_cxx_format_fail(rules, code, suffix):
     """C++: badly formatted code should fail."""
     assert "format" in rules(code, suffix)
@@ -313,6 +328,7 @@ def test_unreadable_file_reported_once(tmp_path):
 def test_hung_clang_format_is_skipped(tmp_path, monkeypatch):
     def hang(cmd, **kwargs):
         raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
     monkeypatch.setattr(subprocess, "run", hang)
     src = tmp_path / "a.c"
     src.write_text("int main(void){return 0;}\n")

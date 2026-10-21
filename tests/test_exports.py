@@ -10,47 +10,56 @@ from epita_coding_style import Config, Severity, check_file
 def _make_funcs(n, static=False):
     """Generate n functions."""
     prefix = "static " if static else ""
-    return "\n".join(
-        f"{prefix}int func{i}(void)\n{{\n    return {i};\n}}"
-        for i in range(n)
-    ) + "\n"
+    return "\n".join(f"{prefix}int func{i}(void)\n{{\n    return {i};\n}}" for i in range(n)) + "\n"
 
 
 def _make_mixed_funcs(n_exported, n_static):
     """Generate a mix of exported and static functions."""
     exported = "\n".join(
-        f"int exported{i}(void)\n{{\n    return {i};\n}}"
-        for i in range(n_exported)
+        f"int exported{i}(void)\n{{\n    return {i};\n}}" for i in range(n_exported)
     )
     static = "\n".join(
-        f"static int static{i}(void)\n{{\n    return {i};\n}}"
-        for i in range(n_static)
+        f"static int static{i}(void)\n{{\n    return {i};\n}}" for i in range(n_static)
     )
     return exported + "\n" + static + "\n"
 
 
 def _make_multiline_funcs(n):
     """Generate n functions with multi-line signatures."""
-    return "\n".join(
-        f"int func{i}(int a,\n           int b)\n{{\n    return {i};\n}}"
-        for i in range(n)
-    ) + "\n"
+    return (
+        "\n".join(
+            f"int func{i}(int a,\n           int b)\n{{\n    return {i};\n}}" for i in range(n)
+        )
+        + "\n"
+    )
 
 
 # =============================================================================
 # export.fun: max 10 exported functions per .c file
 # =============================================================================
 
-@pytest.mark.parametrize("code,should_fail", [
-    (_make_funcs(10), False),
-    (_make_funcs(11), True),
-    (_make_funcs(15, static=True), False),
-    (_make_multiline_funcs(10), False),
-    (_make_multiline_funcs(11), True),
-    (_make_mixed_funcs(10, 5), False),  # 10 exported + 5 static = OK
-    (_make_mixed_funcs(11, 5), True),   # 11 exported + 5 static = fail
-], ids=["10-ok", "11-fail", "15-static-ok", "10-multiline-ok",
-        "11-multiline-fail", "10+5-mixed-ok", "11+5-mixed-fail"])
+
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (_make_funcs(10), False),
+        (_make_funcs(11), True),
+        (_make_funcs(15, static=True), False),
+        (_make_multiline_funcs(10), False),
+        (_make_multiline_funcs(11), True),
+        (_make_mixed_funcs(10, 5), False),  # 10 exported + 5 static = OK
+        (_make_mixed_funcs(11, 5), True),  # 11 exported + 5 static = fail
+    ],
+    ids=[
+        "10-ok",
+        "11-fail",
+        "15-static-ok",
+        "10-multiline-ok",
+        "11-multiline-fail",
+        "10+5-mixed-ok",
+        "11+5-mixed-fail",
+    ],
+)
 def test_export_fun(rules, code, should_fail):
     assert ("export.fun" in rules(code)) == should_fail
 
@@ -127,36 +136,57 @@ STRING_BRACE_LOCAL = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    ("int global_var;\n", False),
-    ("int a;\nint b;\n", True),
-], ids=["one-global-ok", "two-globals-fail"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        ("int global_var;\n", False),
+        ("int a;\nint b;\n", True),
+    ],
+    ids=["one-global-ok", "two-globals-fail"],
+)
 def test_export_other(rules, code, should_fail):
     assert ("export.other" in rules(code)) == should_fail
 
 
-@pytest.mark.parametrize("code", [
-    STATIC_VARS,
-    EXTERN_VARS,
-    LOCAL_VARS,
-    STRUCT_DEF,
-    TYPEDEF_DEF,
-    PROTO_DEF,
-    CONST_STATIC,
-    CHAR_BRACE_LOCAL,
-    STRING_BRACE_LOCAL,
-], ids=["static", "extern", "local", "struct", "typedef",
-        "proto", "const-static", "char-brace", "string-brace"])
+@pytest.mark.parametrize(
+    "code",
+    [
+        STATIC_VARS,
+        EXTERN_VARS,
+        LOCAL_VARS,
+        STRUCT_DEF,
+        TYPEDEF_DEF,
+        PROTO_DEF,
+        CONST_STATIC,
+        CHAR_BRACE_LOCAL,
+        STRING_BRACE_LOCAL,
+    ],
+    ids=[
+        "static",
+        "extern",
+        "local",
+        "struct",
+        "typedef",
+        "proto",
+        "const-static",
+        "char-brace",
+        "string-brace",
+    ],
+)
 def test_export_other_not_exported(rules, code):
     assert "export.other" not in rules(code)
 
 
-@pytest.mark.parametrize("code", [
-    "const int a = 1;\nconst int b = 2;\n",
-    "int *a;\nint *b;\n",
-    "int a[10];\nint b[20];\n",
-    "char c = '{';\nint a;\nint b;\n",
-], ids=["const-globals", "ptr-globals", "array-globals", "char-brace-globals"])
+@pytest.mark.parametrize(
+    "code",
+    [
+        "const int a = 1;\nconst int b = 2;\n",
+        "int *a;\nint *b;\n",
+        "int a[10];\nint b[20];\n",
+        "char c = '{';\nint a;\nint b;\n",
+    ],
+    ids=["const-globals", "ptr-globals", "array-globals", "char-brace-globals"],
+)
 def test_export_other_multiple_globals(rules, code):
     assert "export.other" in rules(code)
 
@@ -182,16 +212,17 @@ def test_export_other_max_globals_zero(tmp_path):
 
 def _make_ptr_return_funcs(n):
     """Generate n exported functions with pointer return types."""
-    return "\n".join(
-        f"int *pfunc{i}(void)\n{{\n    return 0;\n}}"
-        for i in range(n)
-    ) + "\n"
+    return "\n".join(f"int *pfunc{i}(void)\n{{\n    return 0;\n}}" for i in range(n)) + "\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (_make_ptr_return_funcs(10), False),
-    (_make_ptr_return_funcs(11), True),
-], ids=["10-ptr-return-ok", "11-ptr-return-fail"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (_make_ptr_return_funcs(10), False),
+        (_make_ptr_return_funcs(11), True),
+    ],
+    ids=["10-ptr-return-ok", "11-ptr-return-fail"],
+)
 def test_export_fun_pointer_return(rules, code, should_fail):
     """Regression: functions with pointer return types must be counted."""
     assert ("export.fun" in rules(code)) == should_fail

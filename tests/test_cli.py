@@ -20,8 +20,9 @@ FILES = {
     "config_preset_override.toml": 'preset = "42sh"\nmax_lines = 25\n\n[rules]\n"cast" = true\n',
 }
 
-needs_clang_format = pytest.mark.skipif(not shutil.which("clang-format"),
-                                        reason="clang-format not installed")
+needs_clang_format = pytest.mark.skipif(
+    not shutil.which("clang-format"), reason="clang-format not installed"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -30,34 +31,54 @@ def _files(tmp_path):
         (tmp_path / name).write_text(content)
 
 
-@pytest.mark.parametrize("args, code, expected", [
-    pytest.param(["clean.c"], 0, None, id="clean"),
-    pytest.param(["nonexistent/"], 2, None, id="nonexistent-path"),
-    pytest.param(["--help"], 0, "EPITA", id="help"),
-    pytest.param(["bad_goto.c"], 1, "keyword.goto", id="goto-default"),
-    pytest.param(["bad_cast.c"], 1, "cast", id="cast-default"),
-    pytest.param(["bad_lines.c"], 1, "fun.length", id="fun-length-default"),
-    pytest.param(["bad_args.c"], 1, "fun.arg.count", id="fun-arg-count-default"),
-    pytest.param(["bad_funcs.c"], 1, "export.fun", id="export-fun-default"),
-    pytest.param(["--preset", "42sh", "bad_goto.c"], 0, None, id="42sh-allows-goto"),
-    pytest.param(["--preset", "42sh", "bad_cast.c"], 0, None, id="42sh-allows-cast"),
-    pytest.param(["--preset", "42sh", "bad_lines.c"], 0, None, id="42sh-40-lines"),
-    pytest.param(["--config", "config.toml", "bad_goto.c"], 0, None, id="config-disables-goto"),
-    pytest.param(["--config", "config.toml", "bad_cast.c"], 0, None, id="config-disables-cast"),
-    pytest.param(["--config", "config_with_preset.toml", "bad_goto.c"], 0, None,
-                 id="config-preset"),
-    pytest.param(["--config", "config_preset_override.toml", "bad_lines.c"], 1, "fun.length",
-                 id="config-overrides-preset-max-lines"),
-    pytest.param(["--config", "config_preset_override.toml", "bad_cast.c"], 1, "cast",
-                 id="config-overrides-preset-rules"),
-    pytest.param(["--config", "config_preset_override.toml", "bad_goto.c"], 0, None,
-                 id="config-inherits-preset-rules"),
-    pytest.param(["--config", "config_with_preset.toml", "--max-lines", "20", "bad_lines.c"],
-                 1, None, id="cli-flag-overrides-config"),
-    pytest.param(["--max-lines", "50", "bad_lines.c"], 0, None, id="max-lines"),
-    pytest.param(["--max-args", "10", "bad_args.c"], 0, None, id="max-args"),
-    pytest.param(["--max-funcs", "15", "bad_funcs.c"], 0, None, id="max-funcs"),
-])
+@pytest.mark.parametrize(
+    "args, code, expected",
+    [
+        pytest.param(["clean.c"], 0, None, id="clean"),
+        pytest.param(["nonexistent/"], 2, None, id="nonexistent-path"),
+        pytest.param(["--help"], 0, "EPITA", id="help"),
+        pytest.param(["bad_goto.c"], 1, "keyword.goto", id="goto-default"),
+        pytest.param(["bad_cast.c"], 1, "cast", id="cast-default"),
+        pytest.param(["bad_lines.c"], 1, "fun.length", id="fun-length-default"),
+        pytest.param(["bad_args.c"], 1, "fun.arg.count", id="fun-arg-count-default"),
+        pytest.param(["bad_funcs.c"], 1, "export.fun", id="export-fun-default"),
+        pytest.param(["--preset", "42sh", "bad_goto.c"], 0, None, id="42sh-allows-goto"),
+        pytest.param(["--preset", "42sh", "bad_cast.c"], 0, None, id="42sh-allows-cast"),
+        pytest.param(["--preset", "42sh", "bad_lines.c"], 0, None, id="42sh-40-lines"),
+        pytest.param(["--config", "config.toml", "bad_goto.c"], 0, None, id="config-disables-goto"),
+        pytest.param(["--config", "config.toml", "bad_cast.c"], 0, None, id="config-disables-cast"),
+        pytest.param(
+            ["--config", "config_with_preset.toml", "bad_goto.c"], 0, None, id="config-preset"
+        ),
+        pytest.param(
+            ["--config", "config_preset_override.toml", "bad_lines.c"],
+            1,
+            "fun.length",
+            id="config-overrides-preset-max-lines",
+        ),
+        pytest.param(
+            ["--config", "config_preset_override.toml", "bad_cast.c"],
+            1,
+            "cast",
+            id="config-overrides-preset-rules",
+        ),
+        pytest.param(
+            ["--config", "config_preset_override.toml", "bad_goto.c"],
+            0,
+            None,
+            id="config-inherits-preset-rules",
+        ),
+        pytest.param(
+            ["--config", "config_with_preset.toml", "--max-lines", "20", "bad_lines.c"],
+            1,
+            None,
+            id="cli-flag-overrides-config",
+        ),
+        pytest.param(["--max-lines", "50", "bad_lines.c"], 0, None, id="max-lines"),
+        pytest.param(["--max-args", "10", "bad_args.c"], 0, None, id="max-args"),
+        pytest.param(["--max-funcs", "15", "bad_funcs.c"], 0, None, id="max-funcs"),
+    ],
+)
 def test_cli(cli, args, code, expected):
     r = cli(*args)
     assert r.code == code
@@ -70,10 +91,13 @@ def test_empty_dir(cli, tmp_path):
     assert cli("emptydir/").code == 2
 
 
-@pytest.mark.parametrize("dotfile, rule, path", [
-    (".epita-style", "keyword.goto", "bad_goto.c"),
-    (".epita-style.toml", "cast", "bad_cast.c"),
-])
+@pytest.mark.parametrize(
+    "dotfile, rule, path",
+    [
+        (".epita-style", "keyword.goto", "bad_goto.c"),
+        (".epita-style.toml", "cast", "bad_cast.c"),
+    ],
+)
 def test_autodetect_config(cli, tmp_path, dotfile, rule, path):
     (tmp_path / dotfile).write_text(f'[rules]\n"{rule}" = false\n')
     assert cli(path).code == 0

@@ -9,11 +9,15 @@ STATIC_CAST = "void foo() { auto x = static_cast<int>(3.14); }\n"
 REINTERPRET_CAST = "void foo() { auto x = reinterpret_cast<char*>(ptr); }\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (STATIC_CAST, False),
-    (REINTERPRET_CAST, False),
-    (C_STYLE_CAST, True),
-], ids=["static-cast-ok", "reinterpret-cast-ok", "c-style-cast-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (STATIC_CAST, False),
+        (REINTERPRET_CAST, False),
+        (C_STYLE_CAST, True),
+    ],
+    ids=["static-cast-ok", "reinterpret-cast-ok", "c-style-cast-bad"],
+)
 def test_global_casts(rules, code, should_fail):
     assert ("global.casts" in rules(code, ".cc")) == should_fail
 
@@ -26,12 +30,16 @@ FREE_CALL = "void foo() { free(ptr); }\n"
 NEW_CALL = "void foo() { int* p = new int(42); }\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (NEW_CALL, False),
-    (MALLOC_CALL, True),
-    (CALLOC_CALL, True),
-    (FREE_CALL, True),
-], ids=["new-ok", "malloc-bad", "calloc-bad", "free-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (NEW_CALL, False),
+        (MALLOC_CALL, True),
+        (CALLOC_CALL, True),
+        (FREE_CALL, True),
+    ],
+    ids=["new-ok", "malloc-bad", "calloc-bad", "free-bad"],
+)
 def test_global_memory(rules, code, should_fail):
     assert ("global.memory.no_malloc" in rules(code, ".cc")) == should_fail
 
@@ -42,10 +50,14 @@ NULL_USED = "void foo() { int* p = NULL; }\n"
 NULLPTR_USED = "void foo() { int* p = nullptr; }\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (NULLPTR_USED, False),
-    (NULL_USED, True),
-], ids=["nullptr-ok", "null-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (NULLPTR_USED, False),
+        (NULL_USED, True),
+    ],
+    ids=["nullptr-ok", "null-bad"],
+)
 def test_global_nullptr(rules, code, should_fail):
     assert ("global.nullptr" in rules(code, ".cc")) == should_fail
 
@@ -57,11 +69,15 @@ EXTERN_C_BLOCK = 'extern "C" {\nvoid cfunc();\n}\n'
 NO_EXTERN_C = "void foo() {}\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (NO_EXTERN_C, False),
-    (EXTERN_C_SINGLE, True),
-    (EXTERN_C_BLOCK, True),
-], ids=["no-extern-ok", "extern-c-single", "extern-c-block"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (NO_EXTERN_C, False),
+        (EXTERN_C_SINGLE, True),
+        (EXTERN_C_BLOCK, True),
+    ],
+    ids=["no-extern-ok", "extern-c-single", "extern-c-block"],
+)
 def test_c_extern(rules, code, should_fail):
     assert ("c.extern" in rules(code, ".cc")) == should_fail
 
@@ -74,12 +90,16 @@ INCLUDE_CSTDIO = "#include <cstdio>\nint main() { return 0; }\n"
 INCLUDE_IOSTREAM = "#include <iostream>\nint main() { return 0; }\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (INCLUDE_CSTDIO, False),
-    (INCLUDE_IOSTREAM, False),
-    (INCLUDE_STDIO_H, True),
-    (INCLUDE_STDLIB_H, True),
-], ids=["cstdio-ok", "iostream-ok", "stdio.h-bad", "stdlib.h-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (INCLUDE_CSTDIO, False),
+        (INCLUDE_IOSTREAM, False),
+        (INCLUDE_STDIO_H, True),
+        (INCLUDE_STDLIB_H, True),
+    ],
+    ids=["cstdio-ok", "iostream-ok", "stdio.h-bad", "stdlib.h-bad"],
+)
 def test_c_headers(rules, code, should_fail):
     assert ("c.headers" in rules(code, ".cc")) == should_fail
 
@@ -91,24 +111,43 @@ BARE_STRLEN = '#include <cstring>\nvoid foo() { strlen("hello"); }\n'
 STD_COUT = '#include <iostream>\nvoid foo() { std::cout << "hello"; }\n'
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (STD_COUT, False),
-    (BARE_PRINTF, True),
-    (BARE_STRLEN, True),
-], ids=["std-cout-ok", "printf-bad", "strlen-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (STD_COUT, False),
+        (BARE_PRINTF, True),
+        (BARE_STRLEN, True),
+    ],
+    ids=["std-cout-ok", "printf-bad", "strlen-bad"],
+)
 def test_c_std_functions(rules, code, should_fail):
     assert ("c.std_functions" in rules(code, ".cc")) == should_fail
 
 
-@pytest.mark.parametrize("code,rule,should_fail", [
-    ("void f(int x)\n{\n    int y = (x) + 1;\n}\n", "global.casts", False),
-    ("void *xmalloc(int n);\nvoid f(void)\n{\n    xmalloc(4);\n}\n", "global.memory.no_malloc", False),
-    ("void f(void *p)\n{\n    p = realloc(p, 8);\n}\n", "global.memory.no_malloc", True),
-    ("// use NULL here\nint g;\n", "global.nullptr", False),
-    ('const char *s = "NULL";\n', "global.nullptr", False),
-    ('#include "utils.hh"\n', "c.headers", False),
-    ("#include <cstdio>\nvoid f()\n{\n    std::printf(\"x\");\n}\n", "c.std_functions", False),
-], ids=["paren-not-cast", "xmalloc-ok", "realloc-flagged", "null-in-comment",
-        "null-in-string", "local-include", "std-qualified"])
+@pytest.mark.parametrize(
+    "code,rule,should_fail",
+    [
+        ("void f(int x)\n{\n    int y = (x) + 1;\n}\n", "global.casts", False),
+        (
+            "void *xmalloc(int n);\nvoid f(void)\n{\n    xmalloc(4);\n}\n",
+            "global.memory.no_malloc",
+            False,
+        ),
+        ("void f(void *p)\n{\n    p = realloc(p, 8);\n}\n", "global.memory.no_malloc", True),
+        ("// use NULL here\nint g;\n", "global.nullptr", False),
+        ('const char *s = "NULL";\n', "global.nullptr", False),
+        ('#include "utils.hh"\n', "c.headers", False),
+        ('#include <cstdio>\nvoid f()\n{\n    std::printf("x");\n}\n', "c.std_functions", False),
+    ],
+    ids=[
+        "paren-not-cast",
+        "xmalloc-ok",
+        "realloc-flagged",
+        "null-in-comment",
+        "null-in-string",
+        "local-include",
+        "std-qualified",
+    ],
+)
 def test_cxx_global_edges(rules, code, rule, should_fail):
     assert (rule in rules(code, ".cc")) == should_fail

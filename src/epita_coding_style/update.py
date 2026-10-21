@@ -18,7 +18,7 @@ _thread: threading.Thread | None = None
 
 
 def _version(v: str) -> tuple[int, ...]:
-    return tuple(int(x) for x in v.strip().split('.'))
+    return tuple(int(x) for x in v.strip().split("."))
 
 
 def _check(stamp: Path) -> None:
@@ -41,11 +41,17 @@ def _check(stamp: Path) -> None:
 def start_update_check() -> None:
     """Check PyPI in a background thread: interactive runs only, at most daily."""
     global _thread
-    if (not sys.stderr.isatty() or os.environ.get("CI")
-            or os.environ.get("EPITA_STYLE_NO_UPDATE_CHECK")):
+    if (
+        not sys.stderr.isatty()
+        or os.environ.get("CI")
+        or os.environ.get("EPITA_STYLE_NO_UPDATE_CHECK")
+    ):
         return
-    stamp = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache",
-                 "epita-coding-style", "last-update-check")
+    stamp = Path(
+        os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache",
+        "epita-coding-style",
+        "last-update-check",
+    )
     try:
         if time.time() - stamp.stat().st_mtime < 86400:
             return
@@ -61,5 +67,8 @@ def print_update_msg() -> None:
         return
     _thread.join(timeout=1)
     if _newer and not _thread.is_alive():
-        print(f"A new version is available: {__version__} -> {_newer}\n"
-              f"Update: https://pypi.org/project/epita-coding-style/", file=sys.stderr)
+        print(
+            f"A new version is available: {__version__} -> {_newer}\n"
+            f"Update: https://pypi.org/project/epita-coding-style/",
+            file=sys.stderr,
+        )

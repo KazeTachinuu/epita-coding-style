@@ -26,8 +26,10 @@ def git(root, *args):
 
 
 def test_hidden_skipped_without_git(tmp_path):
-    assert found(tmp_path, "src/a.c", "node_modules/a.c", *HIDDEN) \
-        == ["node_modules/a.c", "src/a.c"]
+    assert found(tmp_path, "src/a.c", "node_modules/a.c", *HIDDEN) == [
+        "node_modules/a.c",
+        "src/a.c",
+    ]
 
 
 def test_swap_and_backup_files_skipped(tmp_path):
@@ -55,8 +57,10 @@ def test_gitignore_root_and_nested(tmp_path):
     (tmp_path / "src").mkdir()
     (tmp_path / ".gitignore").write_text("node_modules/\nbuild/\n")
     (tmp_path / "src/.gitignore").write_text("gen.c\n")
-    assert found(tmp_path, "src/a.c", "src/gen.c", "build/b.c", "node_modules/n.c", "gen.c") \
-        == ["gen.c", "src/a.c"]
+    assert found(tmp_path, "src/a.c", "src/gen.c", "build/b.c", "node_modules/n.c", "gen.c") == [
+        "gen.c",
+        "src/a.c",
+    ]
     # Walking a subdirectory still applies the repo's .gitignore files
     assert find_files([str(tmp_path / "src")]) == [str(tmp_path / "src/a.c")]
 
@@ -108,8 +112,7 @@ def test_extension_only_name_skipped(tmp_path):
 
 def test_duplicate_paths_deduped(tmp_path):
     (tmp_path / "a.c").write_text("int x;\n")
-    assert find_files([str(tmp_path), str(tmp_path / "a.c"), "a.c"]) \
-        == [str(tmp_path / "a.c")]
+    assert find_files([str(tmp_path), str(tmp_path / "a.c"), "a.c"]) == [str(tmp_path / "a.c")]
 
 
 @needs_git

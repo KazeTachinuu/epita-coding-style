@@ -19,9 +19,13 @@ class Lang(Enum):
 
 
 _EXT_LANG = {
-    '.c': Lang.C, '.h': Lang.C,
-    '.cc': Lang.CXX, '.hh': Lang.CXX, '.hxx': Lang.CXX,
-    '.cpp': Lang.CXX, '.hpp': Lang.CXX,
+    ".c": Lang.C,
+    ".h": Lang.C,
+    ".cc": Lang.CXX,
+    ".hh": Lang.CXX,
+    ".hxx": Lang.CXX,
+    ".cpp": Lang.CXX,
+    ".hpp": Lang.CXX,
 }
 
 
@@ -54,6 +58,7 @@ def _parser(lang: Lang):
     import tree_sitter_c
     import tree_sitter_cpp
     from tree_sitter import Language, Parser
+
     grammar = tree_sitter_cpp if lang == Lang.CXX else tree_sitter_c
     return Parser(Language(grammar.language()))
 
@@ -80,6 +85,7 @@ class NodeCache:
 @dataclass
 class Source:
     """A parsed C or C++ file: everything a check needs."""
+
     path: str
     lang: Lang
     text: str
@@ -91,36 +97,60 @@ class Source:
     def read(cls, path: str) -> Source:
         """Read and parse path. Raises OSError, or ValueError for a non-C/C++ path."""
         lang = lang_of(path)
-        with open(path, encoding='utf-8', errors='replace', newline='') as f:
+        with open(path, encoding="utf-8", errors="replace", newline="") as f:
             text = f.read()
         data = text.encode()
-        return cls(path, lang, text, text.split('\n'), data,
-                   NodeCache(_parser(lang).parse(data).root_node))
+        return cls(
+            path, lang, text, text.split("\n"), data, NodeCache(_parser(lang).parse(data).root_node)
+        )
 
     def text_of(self, node) -> str:
-        return self.data[node.start_byte:node.end_byte].decode()
+        return self.data[node.start_byte : node.end_byte].decode()
 
     def id_of(self, node) -> str | None:
         """Text of the first identifier in node."""
-        n = next(find_nodes(node, 'identifier'), None)
+        n = next(find_nodes(node, "identifier"), None)
         return None if n is None else self.text_of(n)
 
     def line(self, index: int) -> str | None:
         """Line at 0-based index, or None if out of range."""
         return self.lines[index] if 0 <= index < len(self.lines) else None
 
-    def violation(self, rule: str, message: str, line: int = 1, *, column: int | None = None,
-                  severity: Severity = Severity.MAJOR, show_line: bool = False) -> Violation:
+    def violation(
+        self,
+        rule: str,
+        message: str,
+        line: int = 1,
+        *,
+        column: int | None = None,
+        severity: Severity = Severity.MAJOR,
+        show_line: bool = False,
+    ) -> Violation:
         """Violation at 1-based line; show_line attaches that line's content."""
-        return Violation(self.path, line, rule, message, severity,
-                         self.line(line - 1) if show_line else None, column)
+        return Violation(
+            self.path,
+            line,
+            rule,
+            message,
+            severity,
+            self.line(line - 1) if show_line else None,
+            column,
+        )
 
-    def at(self, node, rule: str, message: str, *, severity: Severity = Severity.MAJOR,
-           column: bool = True) -> Violation:
+    def at(
+        self,
+        node,
+        rule: str,
+        message: str,
+        *,
+        severity: Severity = Severity.MAJOR,
+        column: bool = True,
+    ) -> Violation:
         """Violation at node's start, showing its line (and a caret unless column=False)."""
         row, col = node.start_point
-        return Violation(self.path, row + 1, rule, message, severity,
-                         self.line(row), col if column else None)
+        return Violation(
+            self.path, row + 1, rule, message, severity, self.line(row), col if column else None
+        )
 
 
 def child(node, *types):

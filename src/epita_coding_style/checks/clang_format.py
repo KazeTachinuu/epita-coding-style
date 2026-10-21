@@ -11,7 +11,7 @@ from pathlib import Path
 from ..config import Config
 from ..model import Lang, Violation, lang_from_path, lang_of
 
-_CLANG_ERROR = re.compile(r'^(.*):(\d+):\d+: (?:error|warning):')
+_CLANG_ERROR = re.compile(r"^(.*):(\d+):\d+: (?:error|warning):")
 _CONFIGS = {Lang.C: ".clang-format-c", Lang.CXX: ".clang-format-cxx"}
 
 
@@ -52,7 +52,10 @@ def _run_clang_format(config: str, paths: list[str]) -> dict[str, list[Violation
     try:
         result = subprocess.run(
             ["clang-format", f"--style=file:{config}", "--dry-run", "--Werror", *paths],
-            capture_output=True, text=True, timeout=30 + len(paths))
+            capture_output=True,
+            text=True,
+            timeout=30 + len(paths),
+        )
     except subprocess.TimeoutExpired:
         return {}  # a hung clang-format must not hang the linter: skip the format check
     if result.returncode == 0:
@@ -62,9 +65,17 @@ def _run_clang_format(config: str, paths: list[str]) -> dict[str, list[Violation
         if (m := _CLANG_ERROR.match(line)) and m[1] in paths:
             bad_lines.setdefault(m[1], set()).add(int(m[2]))
     if bad_lines:
-        return {path: [Violation(path, min(lines), "format",
-                                 f"{len(lines)} line{'s need' if len(lines) > 1 else ' needs'} formatting")]
-                for path, lines in bad_lines.items()}
+        return {
+            path: [
+                Violation(
+                    path,
+                    min(lines),
+                    "format",
+                    f"{len(lines)} line{'s need' if len(lines) > 1 else ' needs'} formatting",
+                )
+            ]
+            for path, lines in bad_lines.items()
+        }
     # clang-format failed outright (invalid config, crash): find the culprit file
     if len(paths) > 1:
         return {k: v for path in paths for k, v in _run_clang_format(config, [path]).items()}

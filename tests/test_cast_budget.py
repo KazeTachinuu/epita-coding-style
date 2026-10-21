@@ -96,5 +96,9 @@ def test_negative_override_rejected():
 def test_cli_flag(cli, tmp_path):
     (tmp_path / "a.c").write_text(CASTS_3)
     assert "[epita-cast]" not in cli("--no-color", "--max-casts", "3", "a.c").out
-    assert cli("--no-color", "--max-casts", "2", "a.c").out.count(
-        "Explicit cast (3 in total, max 2) [epita-cast]") == 3
+    assert (
+        cli("--no-color", "--max-casts", "2", "a.c").out.count(
+            "Explicit cast (3 in total, max 2) [epita-cast]"
+        )
+        == 3
+    )

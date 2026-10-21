@@ -5,20 +5,33 @@ import pytest
 from epita_coding_style import Config, check_file
 
 
-@pytest.mark.parametrize("data", [
-    b"\x7fELF\x02\x01\x01\x00" + bytes(range(256)) * 16,
-    b"\xc3\x28\xa0\xa1invalid utf8",
-    b"int main(void)\x00{\x00return 0;\x00}\n",
-    b"\xef\xbb\xbfint x;\n",
-    b"",
-    b"\r\n\r\n\r\n",
-    b"A" * 100_000 + b"\n",
-    b"/*" + b"x" * 1000,
-    b'"' + b"y" * 1000,
-    b"(" * 500 + b")" * 500,
-], ids=["elf-binary", "invalid-utf8", "null-bytes", "bom", "empty",
-        "crlf-only", "long-line", "unterminated-comment",
-        "unterminated-string", "paren-bomb"])
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"\x7fELF\x02\x01\x01\x00" + bytes(range(256)) * 16,
+        b"\xc3\x28\xa0\xa1invalid utf8",
+        b"int main(void)\x00{\x00return 0;\x00}\n",
+        b"\xef\xbb\xbfint x;\n",
+        b"",
+        b"\r\n\r\n\r\n",
+        b"A" * 100_000 + b"\n",
+        b"/*" + b"x" * 1000,
+        b'"' + b"y" * 1000,
+        b"(" * 500 + b")" * 500,
+    ],
+    ids=[
+        "elf-binary",
+        "invalid-utf8",
+        "null-bytes",
+        "bom",
+        "empty",
+        "crlf-only",
+        "long-line",
+        "unterminated-comment",
+        "unterminated-string",
+        "paren-bomb",
+    ],
+)
 def test_garbage_never_crashes(tmp_path, data):
     p = tmp_path / "hostile.c"
     p.write_bytes(data)

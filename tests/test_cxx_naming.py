@@ -14,17 +14,25 @@ STRUCT_SNAKE_CASE = "struct my_struct {};\n"
 STRUCT_CAMELCASE = "struct MyStruct {};\n"
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (CLASS_CAMELCASE, False),
-    (CLASS_SINGLE_WORD, False),
-    (STRUCT_CAMELCASE, False),
-    (CLASS_LOWERCASE, True),
-    (CLASS_SNAKE_CASE, True),
-    (STRUCT_SNAKE_CASE, True),
-], ids=[
-    "class-camelcase-ok", "class-single-word-ok", "struct-camelcase-ok",
-    "class-lowercase-bad", "class-snake-bad", "struct-snake-bad",
-])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (CLASS_CAMELCASE, False),
+        (CLASS_SINGLE_WORD, False),
+        (STRUCT_CAMELCASE, False),
+        (CLASS_LOWERCASE, True),
+        (CLASS_SNAKE_CASE, True),
+        (STRUCT_SNAKE_CASE, True),
+    ],
+    ids=[
+        "class-camelcase-ok",
+        "class-single-word-ok",
+        "struct-camelcase-ok",
+        "class-lowercase-bad",
+        "class-snake-bad",
+        "struct-snake-bad",
+    ],
+)
 def test_naming_class(rules, code, should_fail):
     assert ("naming.class" in rules(code, ".cc")) == should_fail
 
@@ -53,19 +61,27 @@ NS_MISSING_COMMENT = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (NS_LOWERCASE_OK, False),
-    (NS_UPPERCASE, True),
-    (NS_MISSING_COMMENT, True),
-], ids=["lowercase-ok", "uppercase-bad", "missing-comment-bad"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (NS_LOWERCASE_OK, False),
+        (NS_UPPERCASE, True),
+        (NS_MISSING_COMMENT, True),
+    ],
+    ids=["lowercase-ok", "uppercase-bad", "missing-comment-bad"],
+)
 def test_naming_namespace(rules, code, should_fail):
     assert ("naming.namespace" in rules(code, ".cc")) == should_fail
 
 
-@pytest.mark.parametrize("code,rule,should_fail", [
-    ("class foo;\n", "naming.class", True),
-    ("template <class T>\nclass my_vec\n{\n};\n", "naming.class", True),
-    ("namespace\n{\nint x;\n} // namespace\n", "naming.namespace", False),
-], ids=["forward-decl-lowercase", "template-lowercase", "anonymous-ns"])
+@pytest.mark.parametrize(
+    "code,rule,should_fail",
+    [
+        ("class foo;\n", "naming.class", True),
+        ("template <class T>\nclass my_vec\n{\n};\n", "naming.class", True),
+        ("namespace\n{\nint x;\n} // namespace\n", "naming.namespace", False),
+    ],
+    ids=["forward-decl-lowercase", "template-lowercase", "anonymous-ns"],
+)
 def test_cxx_naming_edges(rules, code, rule, should_fail):
     assert (rule in rules(code, ".cc")) == should_fail

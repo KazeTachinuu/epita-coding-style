@@ -25,6 +25,7 @@ def pypi(monkeypatch, tmp_path):
         monkeypatch.setattr(sys.stderr, "isatty", lambda: True)
         payload = json.dumps({"info": {"version": version}}).encode()
         monkeypatch.setattr(update.urllib.request, "urlopen", lambda *_, **__: io.BytesIO(payload))
+
     return latest
 
 
@@ -49,6 +50,7 @@ def test_current_or_older_release_is_silent(pypi, capsys, latest):
 def test_network_failure_is_silent(pypi, capsys, monkeypatch):
     def offline(*_, **__):
         raise OSError("offline")
+
     pypi("999.0.0")
     monkeypatch.setattr(update.urllib.request, "urlopen", offline)
     assert run_check(capsys) == ""

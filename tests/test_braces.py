@@ -100,28 +100,37 @@ CHAR_WITH_VIOLATION = dedent("""\
 """)
 
 
-@pytest.mark.parametrize("code,should_fail", [
-    (ALLMAN, False),
-    (KR_FUNC, True),
-    (KR_IF, True),
-    (ELSE_SAME_LINE, True),
-], ids=["allman-ok", "kr-func", "kr-if", "else-same-line"])
+@pytest.mark.parametrize(
+    "code,should_fail",
+    [
+        (ALLMAN, False),
+        (KR_FUNC, True),
+        (KR_IF, True),
+        (ELSE_SAME_LINE, True),
+    ],
+    ids=["allman-ok", "kr-func", "kr-if", "else-same-line"],
+)
 def test_braces(rules, code, should_fail):
     # Use noformat preset to test braces independently from clang-format
     assert ("braces" in rules(code, preset="noformat")) == should_fail
 
 
-@pytest.mark.parametrize("code", [
-    "int arr[] = {1, 2, 3};\n",
-    DO_WHILE,
-    MACRO,
-], ids=["array-init", "do-while", "macro"])
+@pytest.mark.parametrize(
+    "code",
+    [
+        "int arr[] = {1, 2, 3};\n",
+        DO_WHILE,
+        MACRO,
+    ],
+    ids=["array-init", "do-while", "macro"],
+)
 def test_braces_exceptions(rules, code):
     assert "braces" not in rules(code, preset="noformat")
 
 
-@pytest.mark.parametrize("code", [CHAR_OPEN, CHAR_CLOSE, CHAR_BOTH],
-                         ids=["char-open", "char-close", "char-both"])
+@pytest.mark.parametrize(
+    "code", [CHAR_OPEN, CHAR_CLOSE, CHAR_BOTH], ids=["char-open", "char-close", "char-both"]
+)
 def test_braces_char_literals_no_false_positive(rules, code):
     assert "braces" not in rules(code, preset="noformat")
 

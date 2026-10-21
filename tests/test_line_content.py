@@ -9,7 +9,9 @@ def test_decl_single_line_content(lint):
 
 def test_braces_line_content(lint):
     # Use noformat preset to test braces independently from clang-format
-    [v] = [v for v in lint("void f(void) {\n    return;\n}\n", preset="noformat") if v.rule == "braces"]
+    [v] = [
+        v for v in lint("void f(void) {\n    return;\n}\n", preset="noformat") if v.rule == "braces"
+    ]
     assert v.line_content == "void f(void) {"
     assert v.column == 13  # Position of the opening brace
 
