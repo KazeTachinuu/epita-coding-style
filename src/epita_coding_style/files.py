@@ -10,19 +10,23 @@ from pathlib import Path
 from .model import lang_from_path
 
 
+def _git(directory: str, *args: str, check: bool = False) -> subprocess.CompletedProcess:
+    # The scanned repo may be untrusted: its .git/config could set core.fsmonitor
+    # to a command that git runs even for read-only commands like ls-files.
+    return subprocess.run(["git", "-c", "core.fsmonitor=false", "-C", directory, *args],
+                          capture_output=True, check=check)
+
+
 def _git_files(directory: str) -> list[str] | None:
     """Paths git does not ignore, relative to directory.
 
     None outside a repo, or when directory itself is ignored (named explicitly).
     """
     try:
-        if subprocess.run(["git", "-C", directory, "check-ignore", "-q", "."],
-                          capture_output=True).returncode == 0:
+        if _git(directory, "check-ignore", "-q", ".").returncode == 0:
             return None
-        out = subprocess.run(
-            ["git", "-C", directory, "ls-files", "-z", "--cached", "--others",
-             "--exclude-standard"],
-            capture_output=True, check=True).stdout
+        out = _git(directory, "ls-files", "-z", "--cached", "--others",
+                   "--exclude-standard", check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
     # an empty submodule lists itself as './'

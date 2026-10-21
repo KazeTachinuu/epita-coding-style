@@ -104,3 +104,13 @@ def test_duplicate_paths_deduped(tmp_path):
     (tmp_path / "a.c").write_text("int x;\n")
     assert find_files([str(tmp_path), str(tmp_path / "a.c"), "a.c"]) \
         == [str(tmp_path / "a.c")]
+
+
+@needs_git
+def test_repo_config_cannot_run_commands(tmp_path):
+    """A scanned repo's .git/config must not make git execute anything."""
+    git(tmp_path, "init")
+    marker = tmp_path / "pwned"
+    git(tmp_path, "config", "core.fsmonitor", f"touch '{marker}'; false")
+    assert found(tmp_path, "a.c") == ["a.c"]
+    assert not marker.exists()
