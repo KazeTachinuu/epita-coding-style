@@ -30,6 +30,13 @@ def lang_from_path(path: str) -> Lang | None:
     return _EXT_LANG.get(Path(path).suffix)
 
 
+def lang_of(path: str) -> Lang:
+    """Language of a path known to be C or C++. Raises ValueError otherwise."""
+    if (lang := lang_from_path(path)) is None:
+        raise ValueError(f"not a C/C++ file: {path}")
+    return lang
+
+
 @dataclass
 class Violation:
     file: str
@@ -43,11 +50,11 @@ class Violation:
 
 @cache
 def _parser(lang: Lang):
+    # Imported lazily: --version, --help and --list-rules never parse
+    import tree_sitter_c
+    import tree_sitter_cpp
     from tree_sitter import Language, Parser
-    if lang == Lang.CXX:
-        import tree_sitter_cpp as grammar
-    else:
-        import tree_sitter_c as grammar
+    grammar = tree_sitter_cpp if lang == Lang.CXX else tree_sitter_c
     return Parser(Language(grammar.language()))
 
 
@@ -82,8 +89,8 @@ class Source:
 
     @classmethod
     def read(cls, path: str) -> Source:
-        """Read and parse path. Raises OSError."""
-        lang = lang_from_path(path)
+        """Read and parse path. Raises OSError, or ValueError for a non-C/C++ path."""
+        lang = lang_of(path)
         with open(path, encoding='utf-8', errors='replace', newline='') as f:
             text = f.read()
         data = text.encode()

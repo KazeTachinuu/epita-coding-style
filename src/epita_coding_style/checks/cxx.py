@@ -436,7 +436,7 @@ _PTR_TYPES = frozenset(('pointer_declarator', 'abstract_pointer_declarator'))
 
 def _non_binary_ops(src: Source) -> set[tuple[int, str]]:
     """(row, op) pairs where >, >>, &, or * are NOT binary operators."""
-    excluded = set()
+    excluded: set[tuple[int, str]] = set()
     for node in src.nodes.get(*_TEMPLATE_TYPES, *_REF_TYPES, *_PTR_TYPES, 'trailing_return_type'):
         end = node.end_point[0]
         if node.type in _TEMPLATE_TYPES:

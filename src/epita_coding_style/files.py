@@ -73,7 +73,7 @@ def find_files(paths: list[str]) -> list[str]:
             files.extend(_walk_dir(p))
         else:
             raise FileNotFoundError(p)
-    unique = {}
+    unique: dict[str, str] = {}
     for f in files:
         unique.setdefault(os.path.abspath(f), os.path.normpath(f))
     return sorted(unique.values())

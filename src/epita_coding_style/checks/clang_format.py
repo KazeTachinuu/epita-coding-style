@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 from ..config import Config
-from ..model import Lang, Violation, lang_from_path
+from ..model import Lang, Violation, lang_from_path, lang_of
 
 _CLANG_ERROR = re.compile(r'^(.*):(\d+):\d+: (?:error|warning):')
 _CONFIGS = {Lang.C: ".clang-format-c", Lang.CXX: ".clang-format-cxx"}
@@ -17,7 +17,7 @@ _CONFIGS = {Lang.C: ".clang-format-c", Lang.CXX: ".clang-format-cxx"}
 
 def clang_format_config(path: str) -> str:
     """Nearest .clang-format-{c,cxx} or .clang-format above path, else the bundled one."""
-    name = _CONFIGS[lang_from_path(path)]
+    name = _CONFIGS[lang_of(path)]
     start = Path(os.path.abspath(path)).parent
     for directory in (start, *start.parents):
         for candidate in (directory / name, directory / ".clang-format"):

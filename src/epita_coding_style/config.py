@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-# Python 3.11+ has tomllib built-in, fallback for 3.10
-try:
+if sys.version_info >= (3, 11):
     import tomllib
-except ImportError:
-    import tomli as tomllib  # type: ignore
+else:
+    import tomli as tomllib
 
 
 # Single source of truth: rule -> (description, category, lang).

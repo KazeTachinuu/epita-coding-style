@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 
 from .checks import c, common, cxx
@@ -9,8 +10,10 @@ from .checks.clang_format import check_clang_format
 from .config import Config
 from .model import Lang, Source, Violation, lang_from_path
 
-C_CHECKS = (*common.CHECKS, *c.CHECKS)
-CXX_CHECKS = (cxx.check_file_ext, *common.CHECKS, *cxx.CHECKS)
+Check = Callable[[Source, Config], list[Violation]]
+
+C_CHECKS: tuple[Check, ...] = (*common.CHECKS, *c.CHECKS)
+CXX_CHECKS: tuple[Check, ...] = (cxx.check_file_ext, *common.CHECKS, *cxx.CHECKS)
 
 
 def check_file(path: str, cfg: Config) -> list[Violation]:

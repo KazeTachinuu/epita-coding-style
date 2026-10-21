@@ -74,3 +74,18 @@ def test_config_found_from_subdirectory(tmp_path, monkeypatch):
     sub.mkdir()
     monkeypatch.chdir(sub)
     assert load_config().max_lines == 5
+
+
+# --show-config output is a loadable config
+
+@pytest.mark.parametrize("args", [
+    [],
+    ["--preset", "42sh"],
+    ["--preset", "ppex1", "--max-lines", "12", "--max-casts", "3"],
+])
+def test_show_config_round_trips(cli, tmp_path, args):
+    shown = cli("--no-color", *args, "--show-config").out
+    (tmp_path / ".epita-style.toml").write_text(shown)
+    assert cli("--no-color", "--show-config").out == shown
+    # Regression: the old output listed C++ rules as false, disabling them once loaded
+    assert load_config().with_cxx().is_enabled("naming.class")
