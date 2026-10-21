@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .common import function_declarator
+from .common import definitions
 
 if TYPE_CHECKING:
     from tree_sitter import Node
@@ -19,52 +19,38 @@ def _has_storage(src: Source, decl: Node, keyword: str) -> bool:
     )
 
 
-def check_exports(src: Source, cfg: Config) -> list[Violation]:
-    """Check exported symbols in .c files."""
+def check_export_fun(src: Source, cfg: Config) -> list[Violation]:
+    """Limit exported functions in a .c file."""
     if not src.path.endswith(".c"):
         return []
-
-    v = []
-
-    if cfg.is_enabled("export.fun"):
-        count = 0
-        for func in src.nodes.get("function_definition"):
-            if _has_storage(src, func, "static"):
-                continue
-            for child in func.children:
-                func_decl = function_declarator(child)
-                if func_decl and src.id_of(func_decl):
-                    count += 1
-                    break
-        if count > cfg.max_funcs:
-            v.append(
-                src.violation("export.fun", f"{count} exported functions (max {cfg.max_funcs})")
-            )
-
-    if cfg.is_enabled("export.other"):
-        globals_found = []
-        for decl in src.nodes.root.children:
-            if decl.type != "declaration":
-                continue
-            if any(c.type == "function_declarator" for c in decl.children):
-                continue
-            if (
-                not _has_storage(src, decl, "static")
-                and not _has_storage(src, decl, "extern")
-                and src.id_of(decl)
-            ):
-                globals_found.append(decl.start_point[0] + 1)
-
-        if len(globals_found) > cfg.max_globals:
-            v.append(
-                src.violation(
-                    "export.other",
-                    f"{len(globals_found)} exported globals (max {cfg.max_globals})",
-                    globals_found[cfg.max_globals],
-                )
-            )
-
-    return v
+    count = sum(1 for func, *_ in definitions(src) if not _has_storage(src, func, "static"))
+    if count <= cfg.max_funcs:
+        return []
+    return [src.violation("export.fun", f"{count} exported functions (max {cfg.max_funcs})")]
 
 
-CHECKS = (check_exports,)
+def check_export_other(src: Source, cfg: Config) -> list[Violation]:
+    """Limit exported globals in a .c file."""
+    if not src.path.endswith(".c"):
+        return []
+    globals_found = [
+        decl.start_point[0] + 1
+        for decl in src.nodes.root.children
+        if decl.type == "declaration"
+        and not any(c.type == "function_declarator" for c in decl.children)
+        and not _has_storage(src, decl, "static")
+        and not _has_storage(src, decl, "extern")
+        and src.id_of(decl)
+    ]
+    if len(globals_found) <= cfg.max_globals:
+        return []
+    return [
+        src.violation(
+            "export.other",
+            f"{len(globals_found)} exported globals (max {cfg.max_globals})",
+            globals_found[cfg.max_globals],
+        )
+    ]
+
+
+CHECKS = (check_export_fun, check_export_other)

@@ -191,6 +191,53 @@ def _print_fix_hint(results: dict[str, list[Violation]], c: Colors) -> None:
             print("  " + shlex.join(["clang-format", f"--style=file:{config}", "-i", *paths]))
 
 
+def _report(results: dict[str, list[Violation]], n_files: int, c: Colors, *, quiet: bool) -> int:
+    """Print violations (unless quiet), the summary and the fix hint; return the major count."""
+    major = minor = 0
+    for violations in results.values():
+        for v in violations:
+            if v.severity == Severity.MAJOR:
+                major += 1
+            else:
+                minor += 1
+            if not quiet:
+                print(_render(v, c))
+
+    print(
+        f"\n{c.white}Files: {n_files}  Major: {c.red}{major}{c.reset}  "
+        f"Minor: {c.yellow}{minor}{c.reset}"
+    )
+    if not quiet:
+        _print_fix_hint(results, c)
+    return major
+
+
+def _error(message: str) -> int:
+    print(f"epita-coding-style: error: {message}", file=sys.stderr)
+    return 2
+
+
+def _input_paths(args: list[str]) -> list[str]:
+    """PATH arguments, with '-' replaced by the paths read from stdin."""
+    paths = [p for p in args if p != "-"]
+    if "-" in args:
+        paths += [line.strip() for line in sys.stdin if line.strip()]
+    return paths
+
+
+def _lint(files: list[str], cfg: Config, c: Colors, *, quiet: bool) -> int:
+    """Lint files and print the report; return the exit code."""
+    if not files:
+        print(f"{c.red}epita-coding-style: error: no C/C++ files found{c.reset}", file=sys.stderr)
+        return 2
+    if cfg.is_enabled("format") and not clang_format_active(cfg):
+        print(
+            "epita-coding-style: warning: clang-format not found, format check skipped",
+            file=sys.stderr,
+        )
+    return 1 if _report(lint_files(files, cfg), len(files), c, quiet=quiet) else 0
+
+
 def main() -> int:
     ap = _parser()
     args = ap.parse_args()
@@ -209,8 +256,7 @@ def main() -> int:
             **{name: getattr(args, name) for name in LIMITS},
         )
     except ConfigError as e:
-        print(f"epita-coding-style: error: {e}", file=sys.stderr)
-        return 2
+        return _error(str(e))
 
     if args.show_config:
         _print_config(cfg, c)
@@ -219,43 +265,11 @@ def main() -> int:
 
     if not args.paths:
         ap.error("PATH is required")
-    paths = [p for p in args.paths if p != "-"]
-    if "-" in args.paths:
-        paths += [line.strip() for line in sys.stdin if line.strip()]
-
     try:
-        files = find_files(paths)
+        files = find_files(_input_paths(args.paths))
     except FileNotFoundError as e:
-        print(f"epita-coding-style: error: {e.args[0]}: no such file or directory", file=sys.stderr)
-        return 2
-    if not files:
-        print(f"{c.red}epita-coding-style: error: no C/C++ files found{c.reset}", file=sys.stderr)
-        print_update_msg()
-        return 2
+        return _error(f"{e.args[0]}: no such file or directory")
 
-    if cfg.is_enabled("format") and not clang_format_active(cfg):
-        print(
-            "epita-coding-style: warning: clang-format not found, format check skipped",
-            file=sys.stderr,
-        )
-    results = lint_files(files, cfg)
-
-    major = minor = 0
-    for violations in results.values():
-        for v in violations:
-            if v.severity == Severity.MAJOR:
-                major += 1
-            else:
-                minor += 1
-            if not args.quiet:
-                print(_render(v, c))
-
-    print(
-        f"\n{c.white}Files: {len(files)}  Major: {c.red}{major}{c.reset}  "
-        f"Minor: {c.yellow}{minor}{c.reset}"
-    )
-    if not args.quiet:
-        _print_fix_hint(results, c)
-
+    code = _lint(files, cfg, c, quiet=args.quiet)
     print_update_msg()
-    return 1 if major else 0
+    return code

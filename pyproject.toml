@@ -79,9 +79,7 @@ ignore = [
     "EM102", "TRY003",  # inline exception messages read better here
     "S603", "S607",  # git/clang-format run with fixed argv from PATH by design
     "COM812",  # conflicts with the formatter
-    "C901", "PLR0912", "PLR0915",  # check functions mirror the spec's rule lists; splitting them hides the rules
     "PTH",  # the API takes str paths; os.path on str is fine
-    "PERF401",  # a for/append loop reads better than extend(genexpr) around a multi-line call
 ]
 
 [tool.ruff.lint.pydocstyle]

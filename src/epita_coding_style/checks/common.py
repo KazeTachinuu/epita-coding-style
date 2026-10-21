@@ -10,6 +10,8 @@ from ..model import Severity, Source, Violation, child, find_nodes
 from .clang_format import clang_format_active
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from tree_sitter import Node
 
     from ..config import Config
@@ -20,74 +22,68 @@ _INIT_ASSIGN = re.compile(r"(?<![!=<>])=(?!=)")
 _DIGRAPHS = ("??=", "??/", "??'", "??(", "??)", "??!", "??<", "??>", "??-", "<%", "%>", "<:", ":>")
 
 
-def check_file_format(src: Source, cfg: Config) -> list[Violation]:
-    """Check file formatting rules."""
+def check_file_dos(src: Source, _cfg: Config) -> list[Violation]:
+    if "\r\n" not in src.text:
+        return []
+    return [src.violation("file.dos", "Use Unix LF, not DOS CRLF", show_line=True)]
+
+
+def check_file_terminate(src: Source, _cfg: Config) -> list[Violation]:
+    if not src.text or src.text.endswith("\n"):
+        return []
+    return [
+        src.violation(
+            "file.terminate", "File must end with newline", len(src.lines), show_line=True
+        )
+    ]
+
+
+def check_file_spurious(src: Source, _cfg: Config) -> list[Violation]:
     v = []
     lines = src.lines
-
-    if cfg.is_enabled("file.dos") and "\r\n" in src.text:
-        v.append(src.violation("file.dos", "Use Unix LF, not DOS CRLF", show_line=True))
-
-    if cfg.is_enabled("file.terminate") and src.text and not src.text.endswith("\n"):
+    if not lines[0].strip():
+        v.append(src.violation("file.spurious", "No blank lines at start of file", show_line=True))
+    end_idx = len(lines) - 2 if lines[-1] == "" else len(lines) - 1
+    if end_idx >= 0 and not lines[end_idx].strip():
         v.append(
             src.violation(
-                "file.terminate", "File must end with newline", len(lines), show_line=True
+                "file.spurious", "No blank lines at end of file", end_idx + 1, show_line=True
             )
         )
-
-    if cfg.is_enabled("file.spurious"):
-        if not lines[0].strip():
-            v.append(
-                src.violation("file.spurious", "No blank lines at start of file", show_line=True)
-            )
-        end_idx = len(lines) - 2 if lines[-1] == "" else len(lines) - 1
-        if end_idx >= 0 and not lines[end_idx].strip():
-            v.append(
-                src.violation(
-                    "file.spurious", "No blank lines at end of file", end_idx + 1, show_line=True
-                )
-            )
-
-    if cfg.is_enabled("lines.empty"):
-        # The final '' from a trailing newline is an artifact, not a line
-        last = len(lines) - 1 if lines[-1] == "" else len(lines)
-        v.extend(
-            src.violation("lines.empty", "No consecutive empty lines", i, show_line=True)
-            for i in range(2, last + 1)
-            if not lines[i - 1].strip() and not lines[i - 2].strip()
-        )
-
-    if cfg.is_enabled("file.trailing"):
-        for i, line in enumerate(lines, 1):
-            if line != line.rstrip():
-                v.append(
-                    src.violation(
-                        "file.trailing",
-                        "Trailing whitespace",
-                        i,
-                        column=len(line.rstrip()),
-                        severity=Severity.MINOR,
-                        show_line=True,
-                    )
-                )
-
     return v
 
 
-def check_braces(src: Source, cfg: Config) -> list[Violation]:
-    """Check Allman brace style."""
-    if not cfg.is_enabled("braces"):
-        return []
-    # clang-format owns brace layout when available
-    if clang_format_active(cfg):
-        return []
+def check_lines_empty(src: Source, _cfg: Config) -> list[Violation]:
+    lines = src.lines
+    # The final '' from a trailing newline is an artifact, not a line
+    last = len(lines) - 1 if lines[-1] == "" else len(lines)
+    return [
+        src.violation("lines.empty", "No consecutive empty lines", i, show_line=True)
+        for i in range(2, last + 1)
+        if not lines[i - 1].strip() and not lines[i - 2].strip()
+    ]
 
-    v = []
+
+def check_file_trailing(src: Source, _cfg: Config) -> list[Violation]:
+    return [
+        src.violation(
+            "file.trailing",
+            "Trailing whitespace",
+            i,
+            column=len(line.rstrip()),
+            severity=Severity.MINOR,
+            show_line=True,
+        )
+        for i, line in enumerate(src.lines, 1)
+        if line != line.rstrip()
+    ]
+
+
+def _brace_lines(src: Source) -> Iterator[tuple[int, str, str]]:
+    """Yield (number, line, stripped line with literals blanked) outside comments."""
     in_comment = False
-
     for i, line in enumerate(src.lines, 1):
         s = line.strip()
-
         if "/*" in s and "*/" not in s:
             in_comment = True
             continue
@@ -95,49 +91,64 @@ def check_braces(src: Source, cfg: Config) -> list[Violation]:
             if "*/" in s:
                 in_comment = False
             continue
-
         if not s or s.startswith(("#", "//")):
             continue
+        yield (
+            i,
+            line,
+            _STRING_LITERAL.sub(lambda m: " " * len(m.group()), _CHAR_LITERAL.sub("   ", s)),
+        )
 
-        clean = _STRING_LITERAL.sub(lambda m: " " * len(m.group()), _CHAR_LITERAL.sub("   ", s))
 
-        if "{" in clean:
-            before = clean[: clean.find("{")].strip()
-            is_init = bool(_INIT_ASSIGN.search(before))
-            if (
-                before
-                and not is_init
-                and clean.strip() not in ("{}", "{ }")
-                and before != "do"
-                and not line.rstrip().endswith("\\")
-            ):
-                v.append(
-                    src.violation(
-                        "braces",
-                        "Opening brace must be on its own line",
-                        i,
-                        column=line.find("{"),
-                        show_line=True,
-                    )
+def _opening_misplaced(line: str, clean: str) -> bool:
+    if "{" not in clean:
+        return False
+    before = clean[: clean.find("{")].strip()
+    return bool(
+        before
+        and not _INIT_ASSIGN.search(before)
+        and clean.strip() not in ("{}", "{ }")
+        and before != "do"
+        and not line.rstrip().endswith("\\")
+    )
+
+
+def _closing_misplaced(line: str, clean: str) -> bool:
+    if "}" not in clean or line.rstrip().endswith("\\"):
+        return False
+    after = clean[clean.find("}") + 1 :].strip()
+    return bool(
+        after and not after.startswith(("while", "//", "/*")) and after not in (";", ",", ");")
+    )
+
+
+def check_braces(src: Source, cfg: Config) -> list[Violation]:
+    """Allman brace style."""
+    # clang-format owns brace layout when available
+    if clang_format_active(cfg):
+        return []
+    v = []
+    for i, line, clean in _brace_lines(src):
+        if _opening_misplaced(line, clean):
+            v.append(
+                src.violation(
+                    "braces",
+                    "Opening brace must be on its own line",
+                    i,
+                    column=line.find("{"),
+                    show_line=True,
                 )
-
-        if "}" in clean and not line.rstrip().endswith("\\"):
-            after = clean[clean.find("}") + 1 :].strip()
-            if (
-                after
-                and not after.startswith(("while", "//", "/*"))
-                and after not in (";", ",", ");")
-            ):
-                v.append(
-                    src.violation(
-                        "braces",
-                        "Closing brace must be on its own line",
-                        i,
-                        column=line.find("}"),
-                        show_line=True,
-                    )
+            )
+        if _closing_misplaced(line, clean):
+            v.append(
+                src.violation(
+                    "braces",
+                    "Closing brace must be on its own line",
+                    i,
+                    column=line.find("}"),
+                    show_line=True,
                 )
-
+            )
     return v
 
 
@@ -177,152 +188,75 @@ def _count_function_lines(body: Node, lines: list[str]) -> int:
     return count
 
 
-def check_functions(src: Source, cfg: Config) -> list[Violation]:
-    """Check function rules using AST."""
-    v = []
-    chk_void = cfg.is_enabled("fun.proto.void")
-    chk_args = cfg.is_enabled("fun.arg.count")
-    chk_len = cfg.is_enabled("fun.length")
-    max_args = cfg.max_args
-    max_lines = cfg.max_lines
-
-    def check_params(node: Node, name: str, plist: list[Node] | None, void_msg: str) -> None:
-        # (void) parses as a parameter_declaration, so empty params means ()
-        if chk_void and plist == []:
-            v.append(src.at(node, "fun.proto.void", f"'{name}' {void_msg}", column=False))
-        if chk_args and plist and len(plist) > max_args:
-            v.append(
-                src.at(
-                    node,
-                    "fun.arg.count",
-                    f"'{name}' has {len(plist)} args (max {max_args})",
-                    column=False,
-                )
-            )
-
+def definitions(src: Source) -> Iterator[tuple[Node, str, list[Node] | None, Node | None]]:
+    """(node, name, parameters, body) of each named function definition."""
     for func in src.nodes.get("function_definition"):
         name = None
         plist = None
         body = None
-
         for part in func.children:
-            func_decl = function_declarator(part)
-            if func_decl:
+            if func_decl := function_declarator(part):
                 name = src.id_of(func_decl)
                 plist = params(func_decl)
             elif part.type == "compound_statement":
                 body = part
-
-        if not name:
-            continue
-
-        check_params(func, name, plist, "should use (void) for empty params")
-
-        if chk_len and body:
-            count = _count_function_lines(body, src.lines)
-            if count > max_lines:
-                v.append(
-                    src.at(
-                        func,
-                        "fun.length",
-                        f"Function has {count} lines (max {max_lines})",
-                        column=False,
-                    )
-                )
-
-    if src.path.endswith((".h", ".hh", ".hxx")):
-        for decl in src.nodes.get("declaration"):
-            for func_decl in decl.children:
-                if func_decl.type != "function_declarator":
-                    continue
-                ident = child(func_decl, "identifier")
-                if ident is not None:
-                    check_params(
-                        func_decl, src.text_of(ident), params(func_decl), "should use (void)"
-                    )
-
-    return v
+        if name:
+            yield func, name, plist, body
 
 
-def check_preprocessor(src: Source, cfg: Config) -> list[Violation]:
-    """Check preprocessor and comment rules."""
+def _prototypes(src: Source) -> Iterator[tuple[Node, str, list[Node] | None, str, Node | None]]:
+    """(node, name, parameters, how to write empty ones, body) of definitions and prototypes."""
+    for func, name, plist, body in definitions(src):
+        yield func, name, plist, "should use (void) for empty params", body
+    if not src.path.endswith((".h", ".hh", ".hxx")):
+        return
+    for decl in src.nodes.get("declaration"):
+        for func_decl in decl.children:
+            if func_decl.type != "function_declarator":
+                continue
+            if (ident := child(func_decl, "identifier")) is not None:
+                yield func_decl, src.text_of(ident), params(func_decl), "should use (void)", None
+
+
+def check_functions(src: Source, cfg: Config) -> list[Violation]:
+    """Prototype and length rules, one function at a time: same-line ties keep this order."""
     v = []
-    lines = src.lines
-
-    if cfg.is_enabled("cpp.guard") and src.path.endswith(".h"):
-        guard = os.path.basename(src.path).upper().replace(".", "_").replace("-", "_")
-        if not any("#ifndef" in line and guard in line for line in lines):
+    for node, name, plist, void_msg, body in _prototypes(src):
+        # (void) parses as a parameter_declaration, so empty params means ()
+        if plist == []:
+            v.append(src.at(node, "fun.proto.void", f"'{name}' {void_msg}", column=False))
+        if plist and len(plist) > cfg.max_args:
             v.append(
-                src.violation(
-                    "cpp.guard", f"Missing include guard (#ifndef {guard})", show_line=True
+                src.at(
+                    node,
+                    "fun.arg.count",
+                    f"'{name}' has {len(plist)} args (max {cfg.max_args})",
+                    column=False,
                 )
             )
-
-    if cfg.is_enabled("comment.multi"):
-        v.extend(_check_comment_multi(src))
-
-    check_mark = cfg.is_enabled("cpp.mark")
-    check_if = cfg.is_enabled("cpp.if")
-    check_digraphs = cfg.is_enabled("cpp.digraphs")
-    if not (check_mark or check_if or check_digraphs):
-        return v
-
-    comments = [(n.start_byte, n.end_byte) for n in src.nodes.get("comment")]
-
-    def in_comment(pos: int) -> bool:
-        for start, end in comments:
-            if start <= pos < end:
-                return True
-            if start > pos:
-                break
-        return False
-
-    offset = 0
-    for i, line in enumerate(lines, 1):
-        line_start, offset = offset, offset + len(line) + 1
-        s = line.strip()
-
-        if s.startswith("#") and in_comment(line_start + line.find("#")):
-            continue
-
-        if check_mark and s.startswith("#") and line[0] != "#":
+        if body and (count := _count_function_lines(body, src.lines)) > cfg.max_lines:
             v.append(
-                src.violation("cpp.mark", "# must be on first column", i, column=0, show_line=True)
-            )
-
-        if check_if and s.startswith(("#endif", "#else")) and "//" not in s and "/*" not in s:
-            directive = "#else" if s.startswith("#else") else "#endif"
-            v.append(
-                src.violation(
-                    "cpp.if",
-                    f"{directive} should have comment",
-                    i,
-                    severity=Severity.MINOR,
-                    show_line=True,
+                src.at(
+                    node,
+                    "fun.length",
+                    f"Function has {count} lines (max {cfg.max_lines})",
+                    column=False,
                 )
             )
-
-        if check_digraphs:
-            for d in _DIGRAPHS:
-                col = line.find(d)
-                while col != -1:
-                    if not in_comment(line_start + col):
-                        v.append(
-                            src.violation(
-                                "cpp.digraphs",
-                                f"Digraph '{d}' not allowed",
-                                i,
-                                column=col,
-                                show_line=True,
-                            )
-                        )
-                    col = line.find(d, col + 1)
-
     return v
 
 
-def _check_comment_multi(src: Source) -> list[Violation]:
-    """Check multi-line comments (spec 4.7).
+def check_cpp_guard(src: Source, _cfg: Config) -> list[Violation]:
+    if not src.path.endswith(".h"):
+        return []
+    guard = os.path.basename(src.path).upper().replace(".", "_").replace("-", "_")
+    if any("#ifndef" in line and guard in line for line in src.lines):
+        return []
+    return [src.violation("cpp.guard", f"Missing include guard (#ifndef {guard})", show_line=True)]
+
+
+def check_comment_multi(src: Source, _cfg: Config) -> list[Violation]:
+    """Multi-line comments (spec 4.7).
 
     Bare '/*' or '/**' opener, '**' continuations, '*/' alone on the closing line.
     """
@@ -364,80 +298,135 @@ def _check_comment_multi(src: Source) -> list[Violation]:
     return v
 
 
-def check_misc(src: Source, cfg: Config) -> list[Violation]:
-    """Check misc rules (declarations, asm, goto, cast, comma operator)."""
+def _lines_with_offsets(src: Source) -> Iterator[tuple[int, str, int]]:
+    """Yield (number, line, offset) of lines, except those opening with a commented-out '#'."""
+    offset = 0
+    for i, line in enumerate(src.lines, 1):
+        line_start, offset = offset, offset + len(line) + 1
+        if not (line.strip().startswith("#") and src.in_comment(line_start + line.find("#"))):
+            yield i, line, line_start
+
+
+def check_cpp_mark(src: Source, _cfg: Config) -> list[Violation]:
+    return [
+        src.violation("cpp.mark", "# must be on first column", i, column=0, show_line=True)
+        for i, line, _ in _lines_with_offsets(src)
+        if line.strip().startswith("#") and line[0] != "#"
+    ]
+
+
+def check_cpp_if(src: Source, _cfg: Config) -> list[Violation]:
     v = []
-    nodes = src.nodes
-
-    if cfg.is_enabled("decl.single"):
-        for decl in nodes.get("declaration"):
-            if any(c.type == "function_declarator" for c in decl.children):
-                continue
-            declarators = [
-                c
-                for c in decl.children
-                if c.type
-                in ("init_declarator", "pointer_declarator", "identifier", "array_declarator")
-            ]
-            if len(declarators) > 1:
-                v.append(src.at(decl, "decl.single", "One declaration per line"))
-
-    if cfg.is_enabled("stat.asm"):
-        v.extend(
-            src.at(node, "stat.asm", "asm not allowed")
-            for node in nodes.get("gnu_asm_expression", "gnu_asm_statement")
-        )
-
-    if cfg.is_enabled("keyword.goto"):
-        v.extend(
-            src.at(node, "keyword.goto", "goto not allowed") for node in nodes.get("goto_statement")
-        )
-
-    if cfg.is_enabled("cast"):
-        v.extend(
-            src.at(node, "cast", "Explicit cast not allowed")
-            for node in nodes.get("cast_expression")
-        )
-
-    # stat.sep: comma operator allowed only in 'for' clauses (spec 5.25)
-    if cfg.is_enabled("stat.sep"):
-        for node in nodes.get("comma_expression"):
-            parent = node.parent
-            if parent is not None and parent.type == "comma_expression":
-                continue  # report only the outermost expression
-            while parent is not None and parent.type == "parenthesized_expression":
-                parent = parent.parent
-            if parent is not None and parent.type != "for_statement":
-                v.append(src.at(node, "stat.sep", "Comma operator only allowed in 'for'"))
-
+    for i, line, _ in _lines_with_offsets(src):
+        s = line.strip()
+        if s.startswith(("#endif", "#else")) and "//" not in s and "/*" not in s:
+            directive = "#else" if s.startswith("#else") else "#endif"
+            v.append(
+                src.violation(
+                    "cpp.if",
+                    f"{directive} should have comment",
+                    i,
+                    severity=Severity.MINOR,
+                    show_line=True,
+                )
+            )
     return v
 
 
-def check_vla(src: Source, cfg: Config) -> list[Violation]:
-    """Check for variable-length arrays."""
-    if not cfg.is_enabled("decl.vla"):
-        return []
+def check_cpp_digraphs(src: Source, _cfg: Config) -> list[Violation]:
+    v = []
+    for i, line, line_start in _lines_with_offsets(src):
+        for d in _DIGRAPHS:
+            col = line.find(d)
+            while col != -1:
+                if not src.in_comment(line_start + col):
+                    v.append(
+                        src.violation(
+                            "cpp.digraphs",
+                            f"Digraph '{d}' not allowed",
+                            i,
+                            column=col,
+                            show_line=True,
+                        )
+                    )
+                col = line.find(d, col + 1)
+    return v
+
+
+def check_decl_single(src: Source, _cfg: Config) -> list[Violation]:
+    v = []
+    for decl in src.nodes.get("declaration"):
+        if any(c.type == "function_declarator" for c in decl.children):
+            continue
+        declarators = [
+            c
+            for c in decl.children
+            if c.type in ("init_declarator", "pointer_declarator", "identifier", "array_declarator")
+        ]
+        if len(declarators) > 1:
+            v.append(src.at(decl, "decl.single", "One declaration per line"))
+    return v
+
+
+def check_stat_asm(src: Source, _cfg: Config) -> list[Violation]:
+    return [
+        src.at(node, "stat.asm", "asm not allowed")
+        for node in src.nodes.get("gnu_asm_expression", "gnu_asm_statement")
+    ]
+
+
+def check_keyword_goto(src: Source, _cfg: Config) -> list[Violation]:
+    return [
+        src.at(node, "keyword.goto", "goto not allowed") for node in src.nodes.get("goto_statement")
+    ]
+
+
+def check_cast(src: Source, _cfg: Config) -> list[Violation]:
+    return [
+        src.at(node, "cast", "Explicit cast not allowed")
+        for node in src.nodes.get("cast_expression")
+    ]
+
+
+def check_stat_sep(src: Source, _cfg: Config) -> list[Violation]:
+    """Comma operator allowed only in 'for' clauses (spec 5.25)."""
+    v = []
+    for node in src.nodes.get("comma_expression"):
+        parent = node.parent
+        if parent is not None and parent.type == "comma_expression":
+            continue  # report only the outermost expression
+        while parent is not None and parent.type == "parenthesized_expression":
+            parent = parent.parent
+        if parent is not None and parent.type != "for_statement":
+            v.append(src.at(node, "stat.sep", "Comma operator only allowed in 'for'"))
+    return v
+
+
+def _array_size(arr: Node) -> Node | None:
+    """Return the size expression of an array_declarator: what sits between [ and ]."""
+    size = None
+    for part in arr.children:
+        if part.type == "[":
+            size = None
+        elif part.type == "]":
+            break
+        else:
+            size = part
+    return size
+
+
+def check_decl_vla(src: Source, _cfg: Config) -> list[Violation]:
     v = []
     for decl in src.nodes.get("declaration"):
         for arr in find_nodes(decl, "array_declarator"):
-            # The size expression sits between [ and ]
-            size = None
-            for part in arr.children:
-                if part.type == "[":
-                    size = None
-                elif part.type == "]":
-                    break
-                else:
-                    size = part
+            size = _array_size(arr)
             if size and size.type == "identifier" and not src.text_of(size).isupper():
                 v.append(src.at(arr, "decl.vla", "VLA not allowed"))
     return v
 
 
-def check_ctrl_empty(src: Source, cfg: Config) -> list[Violation]:
-    """Check for empty loop bodies."""
-    if not cfg.is_enabled("ctrl.empty"):
-        return []
+def check_ctrl_empty(src: Source, _cfg: Config) -> list[Violation]:
+    """Empty loop bodies."""
     v = []
     for node in src.nodes.get("for_statement", "while_statement"):
         for part in node.children:
@@ -452,12 +441,25 @@ def check_ctrl_empty(src: Source, cfg: Config) -> list[Violation]:
     return v
 
 
+# Order matters: violations at the same position keep this order
 CHECKS = (
-    check_file_format,
+    check_file_dos,
+    check_file_terminate,
+    check_file_spurious,
+    check_lines_empty,
+    check_file_trailing,
     check_braces,
     check_functions,
-    check_preprocessor,
-    check_misc,
-    check_vla,
+    check_cpp_guard,
+    check_comment_multi,
+    check_cpp_mark,
+    check_cpp_if,
+    check_cpp_digraphs,
+    check_decl_single,
+    check_stat_asm,
+    check_keyword_goto,
+    check_cast,
+    check_stat_sep,
+    check_decl_vla,
     check_ctrl_empty,
 )

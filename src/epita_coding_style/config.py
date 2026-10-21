@@ -219,15 +219,7 @@ def _apply_dict(cfg: Config, data: dict[str, Any], source: str) -> None:
         if key == "preset":
             _preset(val, source)  # applied first by load_config
         elif key == "rules":
-            if not isinstance(val, dict):
-                raise ConfigError(f"{source}: [rules] must be a table")
-            for rule, enabled in val.items():
-                if rule not in RULES:
-                    raise ConfigError(f"{source}: unknown rule '{rule}' (see --list-rules)")
-                if not isinstance(enabled, bool):
-                    raise ConfigError(f"{source}: rule '{rule}' must be true or false")
-            cfg.rules.update(val)
-            cfg.user_rules.update(val.keys())
+            _apply_rules(cfg, val, source)
         elif key in LIMITS:
             if isinstance(val, bool) or not isinstance(val, int) or val < 0:
                 raise ConfigError(f"{source}: {key} must be a non-negative integer")
@@ -235,3 +227,16 @@ def _apply_dict(cfg: Config, data: dict[str, Any], source: str) -> None:
             cfg.user_limits.add(key)
         else:
             raise ConfigError(f"{source}: unknown key '{key}'")
+
+
+def _apply_rules(cfg: Config, rules: object, source: str) -> None:
+    """Apply a validated [rules] table."""
+    if not isinstance(rules, dict):
+        raise ConfigError(f"{source}: [rules] must be a table")
+    for rule, enabled in rules.items():
+        if rule not in RULES:
+            raise ConfigError(f"{source}: unknown rule '{rule}' (see --list-rules)")
+        if not isinstance(enabled, bool):
+            raise ConfigError(f"{source}: rule '{rule}' must be true or false")
+    cfg.rules.update(rules)
+    cfg.user_rules.update(rules.keys())

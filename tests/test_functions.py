@@ -4,7 +4,7 @@ from textwrap import dedent
 
 import pytest
 
-from epita_coding_style import Severity
+from epita_coding_style import Config, Severity, check_file
 
 # Multi-line function signatures
 MULTILINE_6_ARGS = dedent("""\
@@ -213,3 +213,18 @@ def test_proto_void(rules, code, should_fail):
 )
 def test_fun_proto_void_header_edges(rules, code, should_fail):
     assert ("fun.proto.void" in rules(code, ".h")) == should_fail
+
+
+def test_same_line_functions_report_one_function_at_a_time(tmp_path):
+    """Ties on a line keep per-function order: f's violations, then g's."""
+    path = tmp_path / "t.c"
+    path.write_text("void f() { return; } int g(int a, int b, int c, int d, int e) { return a; }\n")
+    cfg = Config()
+    cfg.max_lines = 0
+    violations = check_file(str(path), cfg)
+    assert [(v.rule, v.message) for v in violations if v.rule.startswith("fun.")] == [
+        ("fun.proto.void", "'f' should use (void) for empty params"),
+        ("fun.length", "Function has 1 lines (max 0)"),
+        ("fun.arg.count", "'g' has 5 args (max 4)"),
+        ("fun.length", "Function has 1 lines (max 0)"),
+    ]

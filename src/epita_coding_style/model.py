@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from functools import cache
+from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -117,6 +117,33 @@ class Source:
         """Text of the first identifier in node."""
         n = next(find_nodes(node, "identifier"), None)
         return None if n is None else self.text_of(n)
+
+    @cached_property
+    def code_lines(self) -> list[str]:
+        """Lines with comment text blanked out."""
+        out = list(self.lines)
+        for c in self.nodes.get("comment"):
+            (sr, sc), (er, ec) = c.start_point, c.end_point
+            for r in range(sr, min(er + 1, len(out))):
+                line = out[r]
+                a = sc if r == sr else 0
+                b = ec if r == er else len(line)
+                out[r] = line[:a] + " " * (b - a) + line[b:]
+        return out
+
+    @cached_property
+    def comment_spans(self) -> list[tuple[int, int]]:
+        """(start, end) byte offsets of each comment, in document order."""
+        return [(n.start_byte, n.end_byte) for n in self.nodes.get("comment")]
+
+    def in_comment(self, pos: int) -> bool:
+        """Whether offset pos falls inside a comment."""
+        for start, end in self.comment_spans:
+            if start <= pos < end:
+                return True
+            if start > pos:
+                break
+        return False
 
     def line(self, index: int) -> str | None:
         """Line at 0-based index, or None if out of range."""

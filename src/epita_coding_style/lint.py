@@ -13,6 +13,7 @@ from .model import Lang, Source, Violation, lang_from_path
 Check = Callable[[Source, Config], list[Violation]]
 
 C_CHECKS: tuple[Check, ...] = (*common.CHECKS, *c.CHECKS)
+# file.ext reports at line 1, ahead of everything else
 CXX_CHECKS: tuple[Check, ...] = (cxx.check_file_ext, *common.CHECKS, *cxx.CHECKS)
 
 
@@ -35,6 +36,7 @@ def lint_files(files: list[str], cfg: Config) -> dict[str, list[Violation]]:
 
 
 def _lint(path: str, cfg: Config) -> list[Violation]:
+    """Violations of enabled rules: checks report everything, rule toggles apply here."""
     if lang_from_path(path) is None:
         return []
     try:
@@ -44,7 +46,7 @@ def _lint(path: str, cfg: Config) -> list[Violation]:
     checks = C_CHECKS
     if src.lang == Lang.CXX:
         cfg, checks = cfg.with_cxx(), CXX_CHECKS
-    return [v for check in checks for v in check(src, cfg)]
+    return [v for check in checks for v in check(src, cfg) if cfg.is_enabled(v.rule)]
 
 
 def _apply_cast_budget(results: dict[str, list[Violation]], budget: int) -> None:
