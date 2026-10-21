@@ -1,8 +1,18 @@
 """Pytest fixtures for coding style checker tests."""
 
+import io
+import sys
+from typing import NamedTuple
+
 import pytest
 
-from epita_coding_style import Config, Violation, check_file, load_config
+from epita_coding_style import Violation, check_file, load_config, main
+
+
+class CliResult(NamedTuple):
+    code: int
+    out: str
+    err: str
 
 
 @pytest.fixture(autouse=True)
@@ -12,76 +22,33 @@ def _hermetic_cwd(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def check_result(tmp_path):
-    """Check code string and return violations, optionally filtered by rule."""
-    def _check(code: str, rule: str | None = None, suffix: str = ".c",
-               preset: str | None = "42sh") -> list[Violation]:
+def cli(monkeypatch, capsys):
+    """Run the CLI in-process with args (and optional stdin): returns code/out/err."""
+    def _run(*args: str, stdin: str = "") -> CliResult:
+        monkeypatch.setattr(sys, "argv", ["epita-coding-style", *args])
+        monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+        try:
+            code = main()
+        except SystemExit as e:
+            code = e.code
+        out, err = capsys.readouterr()
+        return CliResult(code, out, err)
+    return _run
+
+
+@pytest.fixture
+def lint(tmp_path):
+    """Lint a code string as tmp_path/test<suffix>: returns its violations."""
+    def _lint(code: str, suffix: str = ".c", preset: str | None = None) -> list[Violation]:
         path = tmp_path / f"test{suffix}"
-        if '\r' in code:
-            path.write_bytes(code.encode())
-        else:
-            path.write_text(code)
-        violations = check_file(str(path), load_config(preset=preset))
-        if rule is not None:
-            return [v for v in violations if v.rule == rule]
-        return violations
-    return _check
+        path.write_bytes(code.encode())
+        return check_file(str(path), load_config(preset=preset))
+    return _lint
 
 
 @pytest.fixture
-def check(check_result):
-    """Check code string for a specific rule. Returns True if violated.
-
-    Defaults to the 42sh preset, which disables keyword.goto and cast:
-    pass preset=None to test those rules.
-    """
-    def _check(code: str, rule: str, suffix: str = ".c", preset: str | None = "42sh") -> bool:
-        return bool(check_result(code, rule, suffix, preset))
-    return _check
-
-
-@pytest.fixture
-def check_cxx(check):
-    """Convenience: check C++ code (suffix=.cc, no preset)."""
-    def _check(code: str, rule: str, suffix: str = ".cc") -> bool:
-        return check(code, rule, suffix=suffix, preset=None)
-    return _check
-
-
-@pytest.fixture
-def check_cxx_result(check_result):
-    """Convenience: check C++ code and return violations."""
-    def _check(code: str, rule: str | None = None, suffix: str = ".cc") -> list[Violation]:
-        return check_result(code, rule=rule, suffix=suffix, preset=None)
-    return _check
-
-
-@pytest.fixture
-def format_check(tmp_path):
-    """Check code for format violations. Returns (has_violation, violations)."""
-    def _check(code: str, suffix: str = ".c"):
-        path = tmp_path / f"test{suffix}"
-        path.write_text(code)
-        cfg = Config()
-        violations = check_file(str(path), cfg)
-        fmt = [v for v in violations if v.rule == "format"]
-        return len(fmt) > 0, fmt
-    return _check
-
-
-@pytest.fixture
-def format_passes(format_check):
-    """Assert code passes format check."""
-    def _assert(code: str, suffix: str, msg: str = ""):
-        has_violation, _ = format_check(code, suffix)
-        assert not has_violation, msg or f"Expected no format violation for {suffix}"
-    return _assert
-
-
-@pytest.fixture
-def format_fails(format_check):
-    """Assert code fails format check."""
-    def _assert(code: str, suffix: str, msg: str = ""):
-        has_violation, _ = format_check(code, suffix)
-        assert has_violation, msg or f"Expected format violation for {suffix}"
-    return _assert
+def rules(lint):
+    """Lint a code string: returns the names of the rules it violates."""
+    def _rules(code: str, suffix: str = ".c", preset: str | None = None) -> set[str]:
+        return {v.rule for v in lint(code, suffix, preset)}
+    return _rules

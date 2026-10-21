@@ -16,8 +16,8 @@ SOURCE_NO_PRAGMA = "int x;\n"
     (SOURCE_NO_PRAGMA, ".cc", False),
     (HEADER_WITH_GUARD, ".hh", True),
 ], ids=["pragma-once-ok", "source-file-ok", "guard-instead-of-pragma"])
-def test_cpp_pragma_once(check_cxx, code, suffix, should_fail):
-    assert check_cxx(code, "cpp.pragma.once", suffix=suffix) == should_fail
+def test_cpp_pragma_once(rules, code, suffix, should_fail):
+    assert ("cpp.pragma.once" in rules(code, suffix)) == should_fail
 
 
 # cpp.include.filetype
@@ -39,8 +39,8 @@ INCLUDE_SYSTEM = "#include <iostream>\nint x;\n"
     (INCLUDE_HEADER_H, True),
 ], ids=["header-hh-ok", "header-hxx-ok", "system-ok",
         "source-cc-bad", "source-c-bad", "header-h-bad"])
-def test_cpp_include_filetype(check_cxx, code, should_fail):
-    assert check_cxx(code, "cpp.include.filetype") == should_fail
+def test_cpp_include_filetype(rules, code, should_fail):
+    assert ("cpp.include.filetype" in rules(code, ".cc")) == should_fail
 
 
 # cpp.include.order
@@ -56,16 +56,16 @@ INCLUDE_LOCAL_BEFORE_SYSTEM = '#include "other.hh"\n\n#include <iostream>\n\nint
     (INCLUDE_SYSTEM_BEFORE_SELF, True),
     (INCLUDE_LOCAL_BEFORE_SYSTEM, True),
 ], ids=["correct-order", "system-before-self", "local-before-system"])
-def test_cpp_include_order(check_cxx, code, should_fail):
-    assert check_cxx(code, "cpp.include.order") == should_fail
+def test_cpp_include_order(rules, code, should_fail):
+    assert ("cpp.include.order" in rules(code, ".cc")) == should_fail
 
 
 # .hh file including same-name .hxx at the end is the standard template pattern
 HEADER_WITH_HXX_AT_END = '#pragma once\n\n#include <map>\n\nclass Foo {};\n\n#include "test.hxx"\n'
 
 
-def test_cpp_include_order_hh_hxx_at_end(check_cxx):
-    assert not check_cxx(HEADER_WITH_HXX_AT_END, "cpp.include.order", suffix=".hh")
+def test_cpp_include_order_hh_hxx_at_end(rules):
+    assert "cpp.include.order" not in rules(HEADER_WITH_HXX_AT_END, ".hh")
 
 
 # cpp.include.order (alphabetical)
@@ -78,8 +78,8 @@ INCLUDES_ALPHA_BAD = '#include <vector>\n#include <algorithm>\nint x;\n'
     (INCLUDES_ALPHA_OK, False),
     (INCLUDES_ALPHA_BAD, True),
 ], ids=["alphabetical-ok", "alphabetical-bad"])
-def test_cpp_include_order_alphabetical(check_cxx, code, should_fail):
-    assert check_cxx(code, "cpp.include.order") == should_fail
+def test_cpp_include_order_alphabetical(rules, code, should_fail):
+    assert ("cpp.include.order" in rules(code, ".cc")) == should_fail
 
 
 # cpp.include.order (blank line between groups)
@@ -97,14 +97,12 @@ INCLUDES_BLANK_LINE_OK = dedent("""\
 INCLUDES_NO_BLANK_LINE = '#include "test.hh"\n#include <iostream>\n#include "other.hh"\nint x;\n'
 
 
-def test_cpp_include_order_blank_line(check_cxx_result):
-    vs = check_cxx_result(INCLUDES_BLANK_LINE_OK, "cpp.include.order")
-    blank_line_vs = [v for v in vs if "blank line" in v.message]
-    assert blank_line_vs == []
-
-    vs = check_cxx_result(INCLUDES_NO_BLANK_LINE, "cpp.include.order")
-    blank_line_vs = [v for v in vs if "blank line" in v.message]
-    assert len(blank_line_vs) > 0
+def test_cpp_include_order_blank_line(lint):
+    def blank_line(code):
+        return [v for v in lint(code, ".cc")
+                if v.rule == "cpp.include.order" and "blank line" in v.message]
+    assert blank_line(INCLUDES_BLANK_LINE_OK) == []
+    assert blank_line(INCLUDES_NO_BLANK_LINE)
 
 
 # cpp.constexpr
@@ -117,9 +115,9 @@ CONSTEXPR_LITERAL = "constexpr int x = 42;\nint main() { return 0; }\n"
     (CONSTEXPR_LITERAL, False),
     (CONST_LITERAL, True),
 ], ids=["constexpr-ok", "const-should-be-constexpr"])
-def test_cpp_constexpr(check_cxx, code, should_fail):
-    assert check_cxx(code, "cpp.constexpr") == should_fail
+def test_cpp_constexpr(rules, code, should_fail):
+    assert ("cpp.constexpr" in rules(code, ".cc")) == should_fail
 
 
-def test_constexpr_runtime_init_not_flagged(check_cxx):
-    assert not check_cxx("int f();\nconst int x = f();\n", "cpp.constexpr")
+def test_constexpr_runtime_init_not_flagged(rules):
+    assert "cpp.constexpr" not in rules("int f();\nconst int x = f();\n", ".cc")

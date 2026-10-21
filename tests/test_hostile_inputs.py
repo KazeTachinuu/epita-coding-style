@@ -3,7 +3,6 @@
 import pytest
 
 from epita_coding_style import Config, check_file
-from epita_coding_style.files import find_files
 
 
 @pytest.mark.parametrize("data", [
@@ -32,14 +31,6 @@ def test_deeply_nested_declarator(tmp_path):
     p = tmp_path / "deep.c"
     p.write_text(code)
     assert isinstance(check_file(str(p), Config()), list)
-
-
-def test_swap_and_hidden_files_skipped(tmp_path):
-    (tmp_path / ".main.c.swp").write_bytes(b"\xb0garbage")
-    (tmp_path / "main.c~").write_text("int x;\n")
-    (tmp_path / "real.c").write_text("int x;\n")
-    files = find_files([str(tmp_path)])
-    assert files == [str(tmp_path / "real.c")]
 
 
 def test_check_file_ignores_non_source(tmp_path):

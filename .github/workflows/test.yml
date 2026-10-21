@@ -40,11 +40,8 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Install clang-format and bats
-        run: sudo apt-get update && sudo apt-get install -y clang-format bats
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
 
-      - name: Run unit tests
+      - name: Run tests
         run: uv run pytest
-
-      - name: Run integration tests
-        run: bats tests/integration/test_cli.bats

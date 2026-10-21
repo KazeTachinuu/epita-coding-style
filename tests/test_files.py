@@ -30,6 +30,12 @@ def test_hidden_skipped_without_git(tmp_path):
         == ["node_modules/a.c", "src/a.c"]
 
 
+def test_swap_and_backup_files_skipped(tmp_path):
+    (tmp_path / ".main.c.swp").write_bytes(b"\xb0garbage")
+    (tmp_path / "main.c~").write_text("int x;\n")
+    assert found(tmp_path, "real.c") == ["real.c"]
+
+
 @needs_git
 def test_hidden_skipped_in_git_repo_even_when_tracked(tmp_path):
     git(tmp_path, "init")

@@ -51,16 +51,16 @@ def _make_multiline_funcs(n):
     (_make_mixed_funcs(11, 5), True),   # 11 exported + 5 static = fail
 ], ids=["10-ok", "11-fail", "15-static-ok", "10-multiline-ok",
         "11-multiline-fail", "10+5-mixed-ok", "11+5-mixed-fail"])
-def test_export_fun(check, code, should_fail):
-    assert check(code, "export.fun") == should_fail
+def test_export_fun(rules, code, should_fail):
+    assert ("export.fun" in rules(code)) == should_fail
 
 
-def test_export_fun_header_not_checked(check):
-    assert not check(_make_funcs(11), "export.fun", suffix=".h")
+def test_export_fun_header_not_checked(rules):
+    assert "export.fun" not in rules(_make_funcs(11), ".h")
 
 
-def test_export_fun_is_major(check_result):
-    violations = [v for v in check_result(_make_funcs(11)) if v.rule == "export.fun"]
+def test_export_fun_is_major(lint):
+    violations = [v for v in lint(_make_funcs(11)) if v.rule == "export.fun"]
     assert violations and all(v.severity == Severity.MAJOR for v in violations)
 
 
@@ -131,8 +131,8 @@ STRING_BRACE_LOCAL = dedent("""\
     ("int global_var;\n", False),
     ("int a;\nint b;\n", True),
 ], ids=["one-global-ok", "two-globals-fail"])
-def test_export_other(check, code, should_fail):
-    assert check(code, "export.other") == should_fail
+def test_export_other(rules, code, should_fail):
+    assert ("export.other" in rules(code)) == should_fail
 
 
 @pytest.mark.parametrize("code", [
@@ -147,8 +147,8 @@ def test_export_other(check, code, should_fail):
     STRING_BRACE_LOCAL,
 ], ids=["static", "extern", "local", "struct", "typedef",
         "proto", "const-static", "char-brace", "string-brace"])
-def test_export_other_not_exported(check, code):
-    assert not check(code, "export.other")
+def test_export_other_not_exported(rules, code):
+    assert "export.other" not in rules(code)
 
 
 @pytest.mark.parametrize("code", [
@@ -157,16 +157,16 @@ def test_export_other_not_exported(check, code):
     "int a[10];\nint b[20];\n",
     "char c = '{';\nint a;\nint b;\n",
 ], ids=["const-globals", "ptr-globals", "array-globals", "char-brace-globals"])
-def test_export_other_multiple_globals(check, code):
-    assert check(code, "export.other")
+def test_export_other_multiple_globals(rules, code):
+    assert "export.other" in rules(code)
 
 
-def test_export_other_header_not_checked(check):
-    assert not check("int a;\nint b;\n", "export.other", suffix=".h")
+def test_export_other_header_not_checked(rules):
+    assert "export.other" not in rules("int a;\nint b;\n", ".h")
 
 
-def test_export_other_is_major(check_result):
-    violations = [v for v in check_result("int a;\nint b;\n") if v.rule == "export.other"]
+def test_export_other_is_major(lint):
+    violations = [v for v in lint("int a;\nint b;\n") if v.rule == "export.other"]
     assert violations and all(v.severity == Severity.MAJOR for v in violations)
 
 
@@ -192,6 +192,6 @@ def _make_ptr_return_funcs(n):
     (_make_ptr_return_funcs(10), False),
     (_make_ptr_return_funcs(11), True),
 ], ids=["10-ptr-return-ok", "11-ptr-return-fail"])
-def test_export_fun_pointer_return(check, code, should_fail):
+def test_export_fun_pointer_return(rules, code, should_fail):
     """Regression: functions with pointer return types must be counted."""
-    assert check(code, "export.fun") == should_fail
+    assert ("export.fun" in rules(code)) == should_fail

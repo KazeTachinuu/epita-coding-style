@@ -16,8 +16,8 @@ EMPTY_BODY_SPACE = "void foo() { }\n"
     (EMPTY_BODY_MULTILINE, True),
     (EMPTY_BODY_SPACE, True),
 ], ids=["same-line-ok", "multiline-bad", "space-inside-bad"])
-def test_braces_empty(check_cxx, code, should_fail):
-    assert check_cxx(code, "braces.empty") == should_fail
+def test_braces_empty(rules, code, should_fail):
+    assert ("braces.empty" in rules(code, ".cc")) == should_fail
 
 
 # braces.single_exp
@@ -97,8 +97,8 @@ DO_WITH_BRACES = dedent("""\
 ], ids=["if-with-braces-ok", "if-without-braces-bad",
         "else-with-braces-ok", "else-without-braces-bad",
         "do-with-braces-ok", "do-without-braces-bad"])
-def test_braces_single_exp(check_cxx, code, should_fail):
-    assert check_cxx(code, "braces.single_exp") == should_fail
+def test_braces_single_exp(rules, code, should_fail):
+    assert ("braces.single_exp" in rules(code, ".cc")) == should_fail
 
 
 # err.throw
@@ -115,8 +115,8 @@ THROW_NEW = '#include <stdexcept>\nvoid foo() { throw new std::runtime_error("er
     (THROW_STRING, True),
     (THROW_NEW, True),
 ], ids=["exception-ok", "integer-bad", "string-bad", "throw-new-bad"])
-def test_err_throw(check_cxx, code, should_fail):
-    assert check_cxx(code, "err.throw") == should_fail
+def test_err_throw(rules, code, should_fail):
+    assert ("err.throw" in rules(code, ".cc")) == should_fail
 
 
 # err.throw.catch
@@ -151,8 +151,8 @@ CATCH_ELLIPSIS = dedent("""\
     (CATCH_ELLIPSIS, False),
     (CATCH_BY_VALUE, True),
 ], ids=["by-ref-ok", "ellipsis-ok", "by-value-bad"])
-def test_err_throw_catch(check_cxx, code, should_fail):
-    assert check_cxx(code, "err.throw.catch") == should_fail
+def test_err_throw_catch(rules, code, should_fail):
+    assert ("err.throw.catch" in rules(code, ".cc")) == should_fail
 
 
 # err.throw.paren
@@ -165,8 +165,8 @@ THROW_WITHOUT_PARENS = '#include <stdexcept>\nvoid foo() { throw std::runtime_er
     (THROW_WITHOUT_PARENS, False),
     (THROW_WITH_PARENS, True),
 ], ids=["no-parens-ok", "parens-bad"])
-def test_err_throw_paren(check_cxx, code, should_fail):
-    assert check_cxx(code, "err.throw.paren") == should_fail
+def test_err_throw_paren(rules, code, should_fail):
+    assert ("err.throw.paren" in rules(code, ".cc")) == should_fail
 
 
 # exp.padding
@@ -206,8 +206,8 @@ OPERATOR_CAST_INT = dedent("""\
     (OPERATOR_CAST_BOOL, False),
     (OPERATOR_CAST_INT, False),
 ], ids=["no-space-ok", "space-bad", "cast-bool-ok", "cast-int-ok"])
-def test_exp_padding(check_cxx, code, should_fail):
-    assert check_cxx(code, "exp.padding") == should_fail
+def test_exp_padding(rules, code, should_fail):
+    assert ("exp.padding" in rules(code, ".cc")) == should_fail
 
 
 # fun.proto.void.cxx
@@ -222,8 +222,8 @@ VOID_IN_DECL = "void foo(void);\n"
     (VOID_PARAMS, True),
     (VOID_IN_DECL, True),
 ], ids=["empty-params-ok", "void-params-bad", "void-in-decl-bad"])
-def test_fun_proto_void_cxx(check_cxx, code, should_fail):
-    assert check_cxx(code, "fun.proto.void.cxx") == should_fail
+def test_fun_proto_void_cxx(rules, code, should_fail):
+    assert ("fun.proto.void.cxx" in rules(code, ".cc")) == should_fail
 
 
 # op.assign
@@ -272,8 +272,8 @@ ASSIGN_COMPOUND_NOT_ASSIGN = dedent("""\
     (ASSIGN_COMPOUND_NOT_ASSIGN, False),
 ], ids=["correct-ok", "no-ref-return-bad", "missing-this-bad",
         "equality-not-assign-ok", "compound-not-assign-ok"])
-def test_op_assign(check_cxx, code, should_fail):
-    assert check_cxx(code, "op.assign") == should_fail
+def test_op_assign(rules, code, should_fail):
+    assert ("op.assign" in rules(code, ".cc")) == should_fail
 
 
 # op.overload
@@ -313,8 +313,8 @@ OVERLOAD_PLUS = dedent("""\
     (OVERLOAD_LOGICAL_OR, True),
     (OVERLOAD_LOGICAL_AND, True),
 ], ids=["plus-ok", "comma-bad", "logical-or-bad", "logical-and-bad"])
-def test_op_overload(check_cxx, code, should_fail):
-    assert check_cxx(code, "op.overload") == should_fail
+def test_op_overload(rules, code, should_fail):
+    assert ("op.overload" in rules(code, ".cc")) == should_fail
 
 
 # op.overload.binand
@@ -327,8 +327,8 @@ OVERLOAD_ADDRESS_OF = dedent("""\
 """)
 
 
-def test_op_overload_binand(check_cxx):
-    assert check_cxx(OVERLOAD_ADDRESS_OF, "op.overload.binand")
+def test_op_overload_binand(rules):
+    assert "op.overload.binand" in rules(OVERLOAD_ADDRESS_OF, ".cc")
 
 
 # enum.class
@@ -341,8 +341,8 @@ ENUM_CLASS = "enum class Color { Red, Green, Blue };\n"
     (ENUM_CLASS, False),
     (PLAIN_ENUM, True),
 ], ids=["enum-class-ok", "plain-enum-bad"])
-def test_enum_class(check_cxx, code, should_fail):
-    assert check_cxx(code, "enum.class") == should_fail
+def test_enum_class(rules, code, should_fail):
+    assert ("enum.class" in rules(code, ".cc")) == should_fail
 
 
 # exp.linebreak
@@ -432,8 +432,8 @@ REAL_BINARY_OP_AT_EOL = dedent("""\
     "pointer-return-type-ok",
     "real-binary-op-at-eol-bad",
 ])
-def test_exp_linebreak(check_cxx, code, should_fail):
-    assert check_cxx(code, "exp.linebreak") == should_fail
+def test_exp_linebreak(rules, code, should_fail):
+    assert ("exp.linebreak" in rules(code, ".cc")) == should_fail
 
 
 @pytest.mark.parametrize("code,rule", [
@@ -442,13 +442,13 @@ def test_exp_linebreak(check_cxx, code, should_fail):
     ("  #pragma once\nint g;\n", "cpp.mark"),
     ("int f(int a, int b, int c, int d, int e)\n{\n    return a;\n}\n", "fun.arg.count"),
 ], ids=["digraphs", "decl-single", "cpp-mark", "arg-count"])
-def test_shared_rules_run_on_cxx(check_cxx, code, rule):
-    assert check_cxx(code, rule)
+def test_shared_rules_run_on_cxx(rules, code, rule):
+    assert rule in rules(code, ".cc")
 
 
-def test_fun_length_runs_on_cxx(check_cxx):
+def test_fun_length_runs_on_cxx(rules):
     body = "\n".join(f"    int x{i} = {i};" for i in range(60))
-    assert check_cxx(f"int f()\n{{\n{body}\n    return 0;\n}}\n", "fun.length")
+    assert "fun.length" in rules(f"int f()\n{{\n{body}\n    return 0;\n}}\n", ".cc")
 
 
 @pytest.mark.parametrize("code,rule,should_fail", [
@@ -462,16 +462,16 @@ def test_fun_length_runs_on_cxx(check_cxx):
     ("enum\n{\n    kA,\n};\n", "enum.class", True),
 ], ids=["bare-rethrow", "paren-expr-throw", "void-ptr-param", "free-fn-overload",
         "binand-assign-ok", "binand-not-logical-and", "enum-struct-ok", "anonymous-enum"])
-def test_cxx_writing_edges(check_cxx, code, rule, should_fail):
-    assert check_cxx(code, rule) == should_fail
+def test_cxx_writing_edges(rules, code, rule, should_fail):
+    assert (rule in rules(code, ".cc")) == should_fail
 
 
 @pytest.mark.parametrize("code,rule,should_fail", [
     ("int f(int y)\n{\n    int x = y; // sum +\n    return x;\n}\n", "exp.linebreak", False),
     ("void f(int b)\n{\n    int x = 0; // a &b\n    x = b;\n}\n", "decl.ref", False),
 ], ids=["op-in-trailing-comment", "ref-in-trailing-comment"])
-def test_comment_blindness_edges(check_cxx, code, rule, should_fail):
-    assert check_cxx(code, rule) == should_fail
+def test_comment_blindness_edges(rules, code, rule, should_fail):
+    assert (rule in rules(code, ".cc")) == should_fail
 
 
 @pytest.mark.parametrize("code,rule,should_fail", [
@@ -479,5 +479,5 @@ def test_comment_blindness_edges(check_cxx, code, rule, should_fail):
     ("/* start\nint &x = y;\n   end */\nint g = 0;\n", "decl.ref", False),
     ('int f(const char *s);\nint g(int y)\n{\n    int x = f("http://x") +\n        y;\n    return x;\n}\n', "exp.linebreak", True),
 ], ids=["op-inside-block-comment", "ref-inside-block-comment", "url-string-kept"])
-def test_comment_scrub_edges(check_cxx, code, rule, should_fail):
-    assert check_cxx(code, rule) == should_fail
+def test_comment_scrub_edges(rules, code, rule, should_fail):
+    assert (rule in rules(code, ".cc")) == should_fail

@@ -25,8 +25,8 @@ STRUCT_CAMELCASE = "struct MyStruct {};\n"
     "class-camelcase-ok", "class-single-word-ok", "struct-camelcase-ok",
     "class-lowercase-bad", "class-snake-bad", "struct-snake-bad",
 ])
-def test_naming_class(check_cxx, code, should_fail):
-    assert check_cxx(code, "naming.class") == should_fail
+def test_naming_class(rules, code, should_fail):
+    assert ("naming.class" in rules(code, ".cc")) == should_fail
 
 
 # naming.namespace
@@ -58,8 +58,8 @@ NS_MISSING_COMMENT = dedent("""\
     (NS_UPPERCASE, True),
     (NS_MISSING_COMMENT, True),
 ], ids=["lowercase-ok", "uppercase-bad", "missing-comment-bad"])
-def test_naming_namespace(check_cxx, code, should_fail):
-    assert check_cxx(code, "naming.namespace") == should_fail
+def test_naming_namespace(rules, code, should_fail):
+    assert ("naming.namespace" in rules(code, ".cc")) == should_fail
 
 
 @pytest.mark.parametrize("code,rule,should_fail", [
@@ -67,5 +67,5 @@ def test_naming_namespace(check_cxx, code, should_fail):
     ("template <class T>\nclass my_vec\n{\n};\n", "naming.class", True),
     ("namespace\n{\nint x;\n} // namespace\n", "naming.namespace", False),
 ], ids=["forward-decl-lowercase", "template-lowercase", "anonymous-ns"])
-def test_cxx_naming_edges(check_cxx, code, rule, should_fail):
-    assert check_cxx(code, rule) == should_fail
+def test_cxx_naming_edges(rules, code, rule, should_fail):
+    assert (rule in rules(code, ".cc")) == should_fail

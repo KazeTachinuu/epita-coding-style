@@ -1,0 +1,69 @@
+exit=1
+bad.c:1:1: error: No blank lines at start of file [epita-file.spurious]
+bad.c:3:1: error: # must be on first column [epita-cpp.mark]
+  #define X 1
+^
+bad.c:5:1: error: One declaration per line [epita-decl.single]
+int g2, g3;
+^
+bad.c:5:1: error: 2 exported globals (max 1) [epita-export.other]
+bad.c:6:1: error: 'helper' should use (void) for empty params [epita-fun.proto.void]
+static int helper(){ return 0; }
+bad.c:6:20: error: Opening brace must be on its own line [epita-braces]
+static int helper(){ return 0; }
+                   ^
+bad.c:7:1: error: 'too_many' has 5 args (max 4) [epita-fun.arg.count]
+int too_many(int a, int b, int c, int d, int e)
+bad.c:10:9: error: VLA not allowed [epita-decl.vla]
+    int arr[n];
+        ^
+bad.c:11:5: error: One declaration per line [epita-decl.single]
+    int x = 1, y = 2;
+    ^
+bad.c:12:1: error: Use 'continue' for empty loops [epita-ctrl.empty]
+    for (x = 0; x < 3; x++);
+bad.c:13:1: error: Use 'continue' for empty loops [epita-ctrl.empty]
+    while (y) {}
+bad.c:13:15: error: Opening brace must be on its own line [epita-braces]
+    while (y) {}
+              ^
+bad.c:14:12: error: goto not allowed [epita-keyword.goto]
+    if (x) goto end;
+           ^
+bad.c:15:9: error: Explicit cast not allowed [epita-cast]
+    y = (int)3.5;
+        ^
+bad.c:16:10: error: Comma operator only allowed in 'for' [epita-stat.sep]
+    x = (1, 2);
+         ^
+bad.c:17:5: error: asm not allowed [epita-stat.asm]
+    asm("nop");
+    ^
+bad.c:18:1: error: Multi-line comment must open with '/*' on its own line [epita-comment.multi]
+    /* bad
+bad.c:19:1: error: '*/' must be on its own line [epita-comment.multi]
+       comment */
+bad.c:21:47: warning: Trailing whitespace [epita-file.trailing]
+    return n + arr[0] + x + y + b + c + d + e;   
+                                              ^
+bad.c:24:1: warning: #endif should have comment [epita-cpp.if]
+#endif
+bad.c:25:13: error: Opening brace must be on its own line [epita-braces]
+int f1(void){return 1;}
+            ^
+bad.c:26:14: error: Opening brace must be on its own line [epita-braces]
+int f2(void) { return ??= 2; }
+             ^
+bad.c:26:23: error: Digraph '??=' not allowed [epita-cpp.digraphs]
+int f2(void) { return ??= 2; }
+                      ^
+bad.c:28:1: error: No blank lines at end of file [epita-file.spurious]
+bad.c:28:1: error: No consecutive empty lines [epita-lines.empty]
+sub/bad.h:1:1: error: Missing include guard (#ifndef BAD_H) [epita-cpp.guard]
+#ifndef WRONG
+sub/bad.h:4:1: error: 'k' should use (void) [epita-fun.proto.void]
+int k();
+sub/bad.h:5:1: warning: #endif should have comment [epita-cpp.if]
+#endif
+
+Files: 2  Major: 25  Minor: 3

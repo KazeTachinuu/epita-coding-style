@@ -1,0 +1,79 @@
+exit=0
+# Copy to .epita-style.toml; uncomment a line to change it
+max_lines = 12                        # Max lines per function body (C++ default: 50)
+# max_args = 4                        # Max arguments per function
+# max_funcs = 10                      # Max exported functions per file
+# max_globals = 1                     # Max exported globals per file
+# max_casts = 0                       # Max explicit casts across all checked C files
+
+[rules]
+# File
+# "file.dos" = true                   # No CRLF line endings (use Unix LF)
+# "file.terminate" = true             # File must end with a newline
+# "file.spurious" = true              # No blank lines at file start/end
+# "file.trailing" = true              # No trailing whitespace
+# "lines.empty" = true                # No consecutive empty lines
+# Style
+# "braces" = true                     # Allman brace style (braces on own line)
+# Functions
+# "fun.length" = true                 # Max lines per function body
+# "fun.arg.count" = true              # Max arguments per function
+# "fun.proto.void" = true             # Use (void) for functions with no parameters
+# Exports
+# "export.fun" = true                 # Max exported (non-static) functions per file
+# "export.other" = true               # Max exported global variables per file
+# Preprocessor
+# "cpp.guard" = true                  # Header files must have include guards
+# "cpp.mark" = true                   # # must be in first column
+# "cpp.if" = true                     # #endif should have a comment
+# "cpp.digraphs" = true               # No digraphs or trigraphs
+# "comment.multi" = true              # Multi-line comment lines start with '**'
+# Declarations
+# "decl.single" = true                # One variable declaration per line
+# "decl.vla" = true                   # No variable-length arrays
+# "stat.asm" = true                   # No inline assembly
+# "stat.sep" = true                   # No comma operator outside 'for'
+# Control
+# "ctrl.empty" = true                 # Use 'continue' in empty loop bodies
+# Strict
+"keyword.goto" = false                # No goto statements
+"cast" = false                        # No explicit casts
+# Formatting
+"format" = false                      # clang-format compliance check
+# CXX-File
+# "file.ext" = true                   # C++ files must use .cc/.hh/.hxx extensions (not .cpp/.hpp)
+# CXX-Preprocessor
+# "cpp.pragma.once" = true            # Use #pragma once instead of include guards
+# "cpp.include.filetype" = true       # Only include .hh/.hxx files (no source files)
+# "cpp.include.order" = true          # Includes ordered: same-name header, system, local
+# "cpp.constexpr" = true              # Compile-time constants should use constexpr
+# CXX-Global
+# "global.casts" = true               # Must use C++ casts (static_cast etc.), not C-style
+# "global.memory.no_malloc" = true    # No malloc/calloc/realloc/free
+# "global.nullptr" = true             # Use nullptr, not NULL
+# "c.extern" = true                   # No extern "C"
+# "c.headers" = true                  # No C headers (use <cstdio> not <stdio.h>)
+# "c.std_functions" = true            # Use std:: equivalents
+# CXX-Naming
+# "naming.class" = true               # CamelCase class/struct names
+# "naming.namespace" = true           # Lowercase namespaces, closing comment
+# CXX-Declarations
+# "decl.ref" = true                   # & next to type, not variable
+# "decl.ctor.explicit" = true         # Single-arg constructors should be explicit
+# "decl.point" = true                 # * next to type, not variable
+# CXX-Control
+# "ctrl.switch" = true                # Default case rules for switch
+# "ctrl.switch.padding" = true        # No space before label colon
+# CXX-Writing
+# "braces.empty" = true               # {} on same line for empty bodies
+# "braces.single_exp" = true          # Prefer braces for single-expression blocks
+# "err.throw" = true                  # Don't throw literals
+# "err.throw.catch" = true            # Catch by reference
+# "err.throw.paren" = true            # No parentheses after throw
+# "exp.padding" = true                # No space in operator keyword (operator++ not operator ++)
+# "exp.linebreak" = true              # Line breaks before binary operators
+# "fun.proto.void.cxx" = true         # MUST NOT use void in C++ empty params
+# "op.assign" = true                  # Return Class& and *this from assignment operators
+# "op.overload" = true                # Don't overload operator,, operator||, operator&&
+# "op.overload.binand" = true         # Don't overload operator&
+# "enum.class" = true                 # Prefer enum class over plain enum

@@ -5,8 +5,6 @@ from textwrap import dedent
 
 import pytest
 
-from epita_coding_style import Config, check_file
-
 # Valid Allman style
 ALLMAN = dedent("""\
     void f(void)
@@ -108,9 +106,9 @@ CHAR_WITH_VIOLATION = dedent("""\
     (KR_IF, True),
     (ELSE_SAME_LINE, True),
 ], ids=["allman-ok", "kr-func", "kr-if", "else-same-line"])
-def test_braces(check, code, should_fail):
+def test_braces(rules, code, should_fail):
     # Use noformat preset to test braces independently from clang-format
-    assert check(code, "braces", preset="noformat") == should_fail
+    assert ("braces" in rules(code, preset="noformat")) == should_fail
 
 
 @pytest.mark.parametrize("code", [
@@ -118,25 +116,22 @@ def test_braces(check, code, should_fail):
     DO_WHILE,
     MACRO,
 ], ids=["array-init", "do-while", "macro"])
-def test_braces_exceptions(check, code):
-    assert not check(code, "braces", preset="noformat")
+def test_braces_exceptions(rules, code):
+    assert "braces" not in rules(code, preset="noformat")
 
 
 @pytest.mark.parametrize("code", [CHAR_OPEN, CHAR_CLOSE, CHAR_BOTH],
                          ids=["char-open", "char-close", "char-both"])
-def test_braces_char_literals_no_false_positive(check, code):
-    assert not check(code, "braces", preset="noformat")
+def test_braces_char_literals_no_false_positive(rules, code):
+    assert "braces" not in rules(code, preset="noformat")
 
 
-def test_braces_char_literal_with_violation(check):
-    assert check(CHAR_WITH_VIOLATION, "braces", preset="noformat")
+def test_braces_char_literal_with_violation(rules):
+    assert "braces" in rules(CHAR_WITH_VIOLATION, preset="noformat")
 
 
-def test_braces_fallback_when_clang_format_missing(tmp_path, monkeypatch):
+def test_braces_fallback_when_clang_format_missing(rules, monkeypatch):
     """Without clang-format, check_braces takes over instead of silence."""
     monkeypatch.setattr(shutil, "which", lambda _: None)
-    path = tmp_path / "test.c"
-    path.write_text("void f(void) {\n    return;\n}\n")
-    rules = {v.rule for v in check_file(str(path), Config())}
-    assert "braces" in rules
-    assert "format" not in rules
+    found = rules("void f(void) {\n    return;\n}\n")
+    assert "braces" in found and "format" not in found

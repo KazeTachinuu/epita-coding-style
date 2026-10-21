@@ -47,26 +47,26 @@ PROTO_EMPTY = dedent("""\
     (MULTILINE_4_ARGS, False),
     (MULTILINE_6_ARGS, True),
 ], ids=["void-ok", "4-args-ok", "5-args-fail", "multiline-4-ok", "multiline-6-fail"])
-def test_arg_count(check, code, should_fail):
-    assert check(code, "fun.arg.count") == should_fail
+def test_arg_count(rules, code, should_fail):
+    assert ("fun.arg.count" in rules(code)) == should_fail
 
 
-def test_arg_count_is_major(check_result):
+def test_arg_count_is_major(lint):
     code = "int f(int a, int b, int c, int d, int e) { return 0; }\n"
-    violations = [v for v in check_result(code) if v.rule == "fun.arg.count"]
+    violations = [v for v in lint(code) if v.rule == "fun.arg.count"]
     assert violations and all(v.severity == Severity.MAJOR for v in violations)
 
 
-def test_func_length_40_ok(check):
+def test_func_length_40_ok(rules):
     body = "\n".join(["    x++;"] * 37)
     code = f"void f(void)\n{{\n    int x = 0;\n{body}\n    return;\n}}\n"
-    assert not check(code, "fun.length")
+    assert "fun.length" not in rules(code, preset="42sh")
 
 
-def test_func_length_41_fail(check):
+def test_func_length_41_fail(rules):
     body = "\n".join(["    x++;"] * 39)
     code = f"void f(void) {{\n    int x = 0;\n{body}\n    return;\n}}\n"
-    assert check(code, "fun.length")
+    assert "fun.length" in rules(code, preset="42sh")
 
 
 # Test pointer return types (char *, int **, etc.)
@@ -81,11 +81,11 @@ def test_func_length_41_fail(check):
     "static char *",
 ], ids=["char*", "int*", "void*", "char**", "int***",
         "struct-foo*", "const-char*", "static-char*"])
-def test_func_length_pointer_return_ok(check, return_type):
+def test_func_length_pointer_return_ok(rules, return_type):
     """Functions with pointer return types under limit should pass."""
     body = "\n".join(["    x++;"] * 37)
     code = f"{return_type} f(void)\n{{\n    int x = 0;\n{body}\n    return 0;\n}}\n"
-    assert not check(code, "fun.length")
+    assert "fun.length" not in rules(code, preset="42sh")
 
 
 @pytest.mark.parametrize("return_type", [
@@ -99,11 +99,11 @@ def test_func_length_pointer_return_ok(check, return_type):
     "static char *",
 ], ids=["char*", "int*", "void*", "char**", "int***",
         "struct-foo*", "const-char*", "static-char*"])
-def test_func_length_pointer_return_fail(check, return_type):
+def test_func_length_pointer_return_fail(rules, return_type):
     """Functions with pointer return types over limit should fail."""
     body = "\n".join(["    x++;"] * 39)
     code = f"{return_type} f(void) {{\n    int x = 0;\n{body}\n    return 0;\n}}\n"
-    assert check(code, "fun.length")
+    assert "fun.length" in rules(code, preset="42sh")
 
 
 @pytest.mark.parametrize("return_type", [
@@ -111,14 +111,14 @@ def test_func_length_pointer_return_fail(check, return_type):
     "int **",
     "void *",
 ], ids=["char*", "int**", "void*"])
-def test_arg_count_pointer_return(check, return_type):
+def test_arg_count_pointer_return(rules, return_type):
     """Arg count check works for functions with pointer return types."""
     # 4 args should pass
     code_ok = f"{return_type} f(int a, int b, int c, int d) {{ return 0; }}\n"
-    assert not check(code_ok, "fun.arg.count")
+    assert "fun.arg.count" not in rules(code_ok)
     # 5 args should fail
     code_fail = f"{return_type} f(int a, int b, int c, int d, int e) {{ return 0; }}\n"
-    assert check(code_fail, "fun.arg.count")
+    assert "fun.arg.count" in rules(code_fail)
 
 
 # Test complex return types (function pointers, array pointers)
@@ -130,31 +130,31 @@ def test_arg_count_pointer_return(check, return_type):
     # Parenthesized declarator - over limit
     ("int (f)(void)", True),
 ], ids=["ptr-to-array", "func-ptr", "paren-declarator"])
-def test_func_length_complex_return_types(check, signature, expect_fail):
+def test_func_length_complex_return_types(rules, signature, expect_fail):
     """Function length detection works for complex return types."""
     body = "\n".join(["    x++;"] * 39)
     code = f"{signature} {{\n    int x = 0;\n{body}\n    return 0;\n}}\n"
-    assert check(code, "fun.length") == expect_fail
+    assert ("fun.length" in rules(code, preset="42sh")) == expect_fail
 
 
 @pytest.mark.parametrize("signature", [
     "int (*f(void))[10]",   # Returns pointer to array
     "int (*f(void))(int)",  # Returns function pointer
 ], ids=["ptr-to-array", "func-ptr"])
-def test_arg_count_complex_return_types(check, signature):
+def test_arg_count_complex_return_types(rules, signature):
     """Arg count detection works for complex return types."""
     # Replace (void) with 5 args to trigger violation
     sig_with_args = signature.replace("(void)", "(int a, int b, int c, int d, int e)")
     code = f"{sig_with_args} {{ return 0; }}\n"
-    assert check(code, "fun.arg.count")
+    assert "fun.arg.count" in rules(code)
 
 
 @pytest.mark.parametrize("code,should_fail", [
     (PROTO_VOID_OK, False),
     (PROTO_EMPTY, True),
 ], ids=["void-ok", "empty-parens-fail"])
-def test_proto_void(check, code, should_fail):
-    assert check(code, "fun.proto.void", suffix=".h") == should_fail
+def test_proto_void(rules, code, should_fail):
+    assert ("fun.proto.void" in rules(code, ".h")) == should_fail
 
 
 @pytest.mark.parametrize("code,should_fail", [
@@ -162,5 +162,5 @@ def test_proto_void(check, code, should_fail):
     ("void (*fp)();\n", False),
     ("void f();\n", True),
 ], ids=["proto-with-arg", "func-pointer", "proto-empty"])
-def test_fun_proto_void_header_edges(check, code, should_fail):
-    assert check(code, "fun.proto.void", suffix=".h") == should_fail
+def test_fun_proto_void_header_edges(rules, code, should_fail):
+    assert ("fun.proto.void" in rules(code, ".h")) == should_fail

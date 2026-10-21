@@ -50,8 +50,8 @@ ELSE_NO_COMMENT = dedent("""\
     (GUARD_OK, False),
     ("int x;\n", True),
 ], ids=["guard-ok", "no-guard"])
-def test_cpp_guard(check, code, should_fail):
-    assert check(code, "cpp.guard", suffix=".h") == should_fail
+def test_cpp_guard(rules, code, should_fail):
+    assert ("cpp.guard" in rules(code, ".h")) == should_fail
 
 
 @pytest.mark.parametrize("code,should_fail", [
@@ -60,8 +60,8 @@ def test_cpp_guard(check, code, should_fail):
     (ELSE_WITH_COMMENT, False),
     (ELSE_NO_COMMENT, True),
 ], ids=["endif-comment-ok", "endif-no-comment", "else-comment-ok", "else-no-comment"])
-def test_cpp_endif_comment(check, code, should_fail):
-    assert check(code, "cpp.if", suffix=".h") == should_fail
+def test_cpp_endif_comment(rules, code, should_fail):
+    assert ("cpp.if" in rules(code, ".h")) == should_fail
 
 
 @pytest.mark.parametrize("code,should_fail", [
@@ -69,8 +69,8 @@ def test_cpp_endif_comment(check, code, should_fail):
     ("  #define X 1\n", True),
     ("\t#define X 1\n", True),
 ], ids=["col0-ok", "indented-spaces", "indented-tab"])
-def test_cpp_mark(check, code, should_fail):
-    assert check(code, "cpp.mark") == should_fail
+def test_cpp_mark(rules, code, should_fail):
+    assert ("cpp.mark" in rules(code)) == should_fail
 
 
 @pytest.mark.parametrize("code,should_fail", [
@@ -86,8 +86,8 @@ def test_cpp_mark(check, code, should_fail):
         "trigraph-in-block-comment", "digraph-in-line-comment",
         "trigraph-in-inline-block-comment", "trigraph-in-multiline-block-comment",
         "digraph-in-code-with-comment"])
-def test_cpp_digraphs(check, code, should_fail):
-    assert check(code, "cpp.digraphs") == should_fail
+def test_cpp_digraphs(rules, code, should_fail):
+    assert ("cpp.digraphs" in rules(code)) == should_fail
 
 
 @pytest.mark.parametrize("code,should_fail", [
@@ -102,23 +102,22 @@ def test_cpp_digraphs(check, code, should_fail):
     "single-line", "line-comment", "double-star", "doxygen",
     "star-continuation", "text-after-opener", "text-before-closer",
 ])
-def test_comment_multi(check, code, should_fail):
-    assert check(code, "comment.multi") == should_fail
+def test_comment_multi(rules, code, should_fail):
+    assert ("comment.multi" in rules(code)) == should_fail
 
 
-def test_comment_multi_reports_each_bad_line(check_result):
+def test_comment_multi_reports_each_bad_line(lint):
     code = "/*\n * one\n * two\n*/\nint g;\n"
-    violations = check_result(code, "comment.multi")
-    assert [v.line for v in violations] == [2, 3]
+    assert [v.line for v in lint(code) if v.rule == "comment.multi"] == [2, 3]
 
 
-def test_comment_multi_ignored_for_cxx(check_cxx):
-    assert not check_cxx("/*\n * star style\n */\nint g;\n", "comment.multi")
+def test_comment_multi_ignored_for_cxx(rules):
+    assert "comment.multi" not in rules("/*\n * star style\n */\nint g;\n", ".cc")
 
 
-def test_cpp_guard_not_required_in_source(check):
-    assert not check("int x;\n", "cpp.guard")
+def test_cpp_guard_not_required_in_source(rules):
+    assert "cpp.guard" not in rules("int x;\n")
 
 
-def test_cpp_if_ignores_directive_inside_comment(check):
-    assert not check("/*\n** #endif\n*/\nint g;\n", "cpp.if")
+def test_cpp_if_ignores_directive_inside_comment(rules):
+    assert "cpp.if" not in rules("/*\n** #endif\n*/\nint g;\n")

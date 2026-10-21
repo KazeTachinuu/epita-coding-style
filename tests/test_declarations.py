@@ -11,8 +11,8 @@ import pytest
     ("int x, y;\n", True),
     ("int *x, *y;\n", True),
 ], ids=["single-decl", "single-init", "multi-decl", "multi-ptr-decl"])
-def test_decl_single(check, code, should_fail):
-    assert check(code, "decl.single") == should_fail
+def test_decl_single(rules, code, should_fail):
+    assert ("decl.single" in rules(code)) == should_fail
 
 
 VLA_MACRO_OK = dedent("""\
@@ -80,8 +80,8 @@ COND_ARRAY_ACCESS = dedent("""\
     "fixed-size", "macro-size", "return-access", "assign-access",
     "funcall-access", "cond-access", "vla-int", "vla-char", "vla-mat",
 ])
-def test_decl_vla(check, code, should_fail):
-    assert check(code, "decl.vla") == should_fail
+def test_decl_vla(rules, code, should_fail):
+    assert ("decl.vla" in rules(code)) == should_fail
 
 
 STAT_SEP_FOR_OK = dedent("""\
@@ -117,8 +117,8 @@ STAT_SEP_FOR_INIT_OK = dedent("""\
     (STAT_SEP_FOR_INIT_OK, False),
     (STAT_SEP_STMT_BAD, True),
 ], ids=["for-update", "for-init", "statement"])
-def test_stat_sep(check, code, should_fail):
-    assert check(code, "stat.sep") == should_fail
+def test_stat_sep(rules, code, should_fail):
+    assert ("stat.sep" in rules(code)) == should_fail
 
 
 STAT_SEP_CALL_OK = dedent("""\
@@ -147,13 +147,13 @@ NESTED_COMMA_BAD = dedent("""\
 """)
 
 
-def test_stat_sep_call_args_not_flagged(check):
-    assert not check(STAT_SEP_CALL_OK, "stat.sep")
+def test_stat_sep_call_args_not_flagged(rules):
+    assert "stat.sep" not in rules(STAT_SEP_CALL_OK)
 
 
-def test_stat_sep_while_condition_flagged(check):
-    assert check(STAT_SEP_WHILE_BAD, "stat.sep")
+def test_stat_sep_while_condition_flagged(rules):
+    assert "stat.sep" in rules(STAT_SEP_WHILE_BAD)
 
 
-def test_stat_sep_nested_comma_reported_once(check_result):
-    assert len(check_result(NESTED_COMMA_BAD, "stat.sep")) == 1
+def test_stat_sep_nested_comma_reported_once(lint):
+    assert [v.rule for v in lint(NESTED_COMMA_BAD)].count("stat.sep") == 1

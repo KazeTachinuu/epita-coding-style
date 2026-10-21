@@ -34,8 +34,8 @@ SWITCH_NESTED_INNER_DEFAULT = dedent("""\
     (SWITCH_NO_DEFAULT, True),
     (SWITCH_NESTED_INNER_DEFAULT, True),
 ], ids=["with-default", "without-default", "nested-inner-default-only"])
-def test_ctrl_switch(check_cxx, code, should_fail):
-    assert check_cxx(code, "ctrl.switch") == should_fail
+def test_ctrl_switch(rules, code, should_fail):
+    assert ("ctrl.switch" in rules(code, ".cc")) == should_fail
 
 
 # ctrl.switch.padding
@@ -85,8 +85,8 @@ SWITCH_NO_SPACE_BEFORE_COLON = dedent("""\
     (SWITCH_SPACE_BEFORE_COLON, True),
     (SWITCH_TAB_BEFORE_COLON, True),
 ], ids=["no-space", "space-before-colon", "tab-before-colon"])
-def test_ctrl_switch_padding(check_cxx, code, should_fail):
-    assert check_cxx(code, "ctrl.switch.padding") == should_fail
+def test_ctrl_switch_padding(rules, code, should_fail):
+    assert ("ctrl.switch.padding" in rules(code, ".cc")) == should_fail
 
 
 # ctrl.empty
@@ -134,11 +134,11 @@ FOR_WITH_CONTINUE = dedent("""\
     (FOR_WITH_CONTINUE, False),
     (EMPTY_FOR_BODY, True),
 ], ids=["continue-ok", "empty-while", "for-continue-ok", "empty-for"])
-def test_ctrl_empty(check_cxx, code, should_fail):
-    assert check_cxx(code, "ctrl.empty") == should_fail
+def test_ctrl_empty(rules, code, should_fail):
+    assert ("ctrl.empty" in rules(code, ".cc")) == should_fail
 
 
-def test_switch_padding_ignores_ternary_colon(check_cxx):
+def test_switch_padding_ignores_ternary_colon(rules):
     code = ("void f(int v, int y)\n{\n    switch (v)\n    {\n"
             "    case 1:\n        v = y ? 1 : 2;\n        break;\n    }\n}\n")
-    assert not check_cxx(code, "ctrl.switch.padding")
+    assert "ctrl.switch.padding" not in rules(code, ".cc")

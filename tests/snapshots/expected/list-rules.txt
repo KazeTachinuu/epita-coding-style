@@ -1,0 +1,86 @@
+exit=0
+File:
+  file.dos                 No CRLF line endings (use Unix LF)
+  file.terminate           File must end with a newline
+  file.spurious            No blank lines at file start/end
+  file.trailing            No trailing whitespace
+  lines.empty              No consecutive empty lines
+
+Style:
+  braces                   Allman brace style (braces on own line)
+
+Functions:
+  fun.length               Max lines per function body
+  fun.arg.count            Max arguments per function
+  fun.proto.void           Use (void) for functions with no parameters
+
+Exports:
+  export.fun               Max exported (non-static) functions per file
+  export.other             Max exported global variables per file
+
+Preprocessor:
+  cpp.guard                Header files must have include guards
+  cpp.mark                 # must be in first column
+  cpp.if                   #endif should have a comment
+  cpp.digraphs             No digraphs or trigraphs
+  comment.multi            Multi-line comment lines start with '**'
+
+Declarations:
+  decl.single              One variable declaration per line
+  decl.vla                 No variable-length arrays
+  stat.asm                 No inline assembly
+  stat.sep                 No comma operator outside 'for'
+
+Control:
+  ctrl.empty               Use 'continue' in empty loop bodies
+
+Strict:
+  keyword.goto             No goto statements
+  cast                     No explicit casts
+
+Formatting:
+  format                   clang-format compliance check
+
+CXX-File:
+  file.ext                 C++ files must use .cc/.hh/.hxx extensions (not .cpp/.hpp)
+
+CXX-Preprocessor:
+  cpp.pragma.once          Use #pragma once instead of include guards
+  cpp.include.filetype     Only include .hh/.hxx files (no source files)
+  cpp.include.order        Includes ordered: same-name header, system, local
+  cpp.constexpr            Compile-time constants should use constexpr
+
+CXX-Global:
+  global.casts             Must use C++ casts (static_cast etc.), not C-style
+  global.memory.no_malloc  No malloc/calloc/realloc/free
+  global.nullptr           Use nullptr, not NULL
+  c.extern                 No extern "C"
+  c.headers                No C headers (use <cstdio> not <stdio.h>)
+  c.std_functions          Use std:: equivalents
+
+CXX-Naming:
+  naming.class             CamelCase class/struct names
+  naming.namespace         Lowercase namespaces, closing comment
+
+CXX-Declarations:
+  decl.ref                 & next to type, not variable
+  decl.ctor.explicit       Single-arg constructors should be explicit
+  decl.point               * next to type, not variable
+
+CXX-Control:
+  ctrl.switch              Default case rules for switch
+  ctrl.switch.padding      No space before label colon
+
+CXX-Writing:
+  braces.empty             {} on same line for empty bodies
+  braces.single_exp        Prefer braces for single-expression blocks
+  err.throw                Don't throw literals
+  err.throw.catch          Catch by reference
+  err.throw.paren          No parentheses after throw
+  exp.padding              No space in operator keyword (operator++ not operator ++)
+  exp.linebreak            Line breaks before binary operators
+  fun.proto.void.cxx       MUST NOT use void in C++ empty params
+  op.assign                Return Class& and *this from assignment operators
+  op.overload              Don't overload operator,, operator||, operator&&
+  op.overload.binand       Don't overload operator&
+  enum.class               Prefer enum class over plain enum

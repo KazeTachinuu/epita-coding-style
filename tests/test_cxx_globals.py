@@ -14,8 +14,8 @@ REINTERPRET_CAST = "void foo() { auto x = reinterpret_cast<char*>(ptr); }\n"
     (REINTERPRET_CAST, False),
     (C_STYLE_CAST, True),
 ], ids=["static-cast-ok", "reinterpret-cast-ok", "c-style-cast-bad"])
-def test_global_casts(check_cxx, code, should_fail):
-    assert check_cxx(code, "global.casts") == should_fail
+def test_global_casts(rules, code, should_fail):
+    assert ("global.casts" in rules(code, ".cc")) == should_fail
 
 
 # global.memory.no_malloc
@@ -32,8 +32,8 @@ NEW_CALL = "void foo() { int* p = new int(42); }\n"
     (CALLOC_CALL, True),
     (FREE_CALL, True),
 ], ids=["new-ok", "malloc-bad", "calloc-bad", "free-bad"])
-def test_global_memory(check_cxx, code, should_fail):
-    assert check_cxx(code, "global.memory.no_malloc") == should_fail
+def test_global_memory(rules, code, should_fail):
+    assert ("global.memory.no_malloc" in rules(code, ".cc")) == should_fail
 
 
 # global.nullptr
@@ -46,8 +46,8 @@ NULLPTR_USED = "void foo() { int* p = nullptr; }\n"
     (NULLPTR_USED, False),
     (NULL_USED, True),
 ], ids=["nullptr-ok", "null-bad"])
-def test_global_nullptr(check_cxx, code, should_fail):
-    assert check_cxx(code, "global.nullptr") == should_fail
+def test_global_nullptr(rules, code, should_fail):
+    assert ("global.nullptr" in rules(code, ".cc")) == should_fail
 
 
 # c.extern
@@ -62,8 +62,8 @@ NO_EXTERN_C = "void foo() {}\n"
     (EXTERN_C_SINGLE, True),
     (EXTERN_C_BLOCK, True),
 ], ids=["no-extern-ok", "extern-c-single", "extern-c-block"])
-def test_c_extern(check_cxx, code, should_fail):
-    assert check_cxx(code, "c.extern") == should_fail
+def test_c_extern(rules, code, should_fail):
+    assert ("c.extern" in rules(code, ".cc")) == should_fail
 
 
 # c.headers
@@ -80,8 +80,8 @@ INCLUDE_IOSTREAM = "#include <iostream>\nint main() { return 0; }\n"
     (INCLUDE_STDIO_H, True),
     (INCLUDE_STDLIB_H, True),
 ], ids=["cstdio-ok", "iostream-ok", "stdio.h-bad", "stdlib.h-bad"])
-def test_c_headers(check_cxx, code, should_fail):
-    assert check_cxx(code, "c.headers") == should_fail
+def test_c_headers(rules, code, should_fail):
+    assert ("c.headers" in rules(code, ".cc")) == should_fail
 
 
 # c.std_functions
@@ -96,8 +96,8 @@ STD_COUT = '#include <iostream>\nvoid foo() { std::cout << "hello"; }\n'
     (BARE_PRINTF, True),
     (BARE_STRLEN, True),
 ], ids=["std-cout-ok", "printf-bad", "strlen-bad"])
-def test_c_std_functions(check_cxx, code, should_fail):
-    assert check_cxx(code, "c.std_functions") == should_fail
+def test_c_std_functions(rules, code, should_fail):
+    assert ("c.std_functions" in rules(code, ".cc")) == should_fail
 
 
 @pytest.mark.parametrize("code,rule,should_fail", [
@@ -110,5 +110,5 @@ def test_c_std_functions(check_cxx, code, should_fail):
     ("#include <cstdio>\nvoid f()\n{\n    std::printf(\"x\");\n}\n", "c.std_functions", False),
 ], ids=["paren-not-cast", "xmalloc-ok", "realloc-flagged", "null-in-comment",
         "null-in-string", "local-include", "std-qualified"])
-def test_cxx_global_edges(check_cxx, code, rule, should_fail):
-    assert check_cxx(code, rule) == should_fail
+def test_cxx_global_edges(rules, code, rule, should_fail):
+    assert (rule in rules(code, ".cc")) == should_fail

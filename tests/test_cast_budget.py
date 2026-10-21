@@ -1,8 +1,5 @@
 """max_casts: a budget of explicit casts shared by all files of one run."""
 
-import subprocess
-import sys
-
 import pytest
 
 from epita_coding_style import Config, ConfigError, check_file, load_config
@@ -96,14 +93,8 @@ def test_negative_override_rejected():
         load_config(max_casts=-1)
 
 
-def test_cli_flag(tmp_path):
-    write(tmp_path, **{"a.c": CASTS_3, ".epita-style.toml": '[rules]\n"format" = false\n'})
-
-    def run(*args):
-        return subprocess.run(
-            [sys.executable, "-c", "import sys; from epita_coding_style import main; sys.exit(main())",
-             "--no-color", *args, "a.c"],
-            cwd=tmp_path, capture_output=True, text=True).stdout
-
-    assert "[epita-cast]" not in run("--max-casts", "3")
-    assert run("--max-casts", "2").count("Explicit cast (3 in total, max 2) [epita-cast]") == 3
+def test_cli_flag(cli, tmp_path):
+    (tmp_path / "a.c").write_text(CASTS_3)
+    assert "[epita-cast]" not in cli("--no-color", "--max-casts", "3", "a.c").out
+    assert cli("--no-color", "--max-casts", "2", "a.c").out.count(
+        "Explicit cast (3 in total, max 2) [epita-cast]") == 3

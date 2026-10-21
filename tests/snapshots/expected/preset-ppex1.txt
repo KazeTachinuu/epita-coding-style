@@ -1,0 +1,152 @@
+exit=1
+bad.c:1:1: error: No blank lines at start of file [epita-file.spurious]
+bad.c:3:1: error: # must be on first column [epita-cpp.mark]
+  #define X 1
+^
+bad.c:5:1: error: One declaration per line [epita-decl.single]
+int g2, g3;
+^
+bad.c:5:1: error: 2 exported globals (max 1) [epita-export.other]
+bad.c:6:1: error: 'helper' should use (void) for empty params [epita-fun.proto.void]
+static int helper(){ return 0; }
+bad.c:6:20: error: Opening brace must be on its own line [epita-braces]
+static int helper(){ return 0; }
+                   ^
+bad.c:7:1: error: 'too_many' has 5 args (max 4) [epita-fun.arg.count]
+int too_many(int a, int b, int c, int d, int e)
+bad.c:10:9: error: VLA not allowed [epita-decl.vla]
+    int arr[n];
+        ^
+bad.c:11:5: error: One declaration per line [epita-decl.single]
+    int x = 1, y = 2;
+    ^
+bad.c:12:1: error: Use 'continue' for empty loops [epita-ctrl.empty]
+    for (x = 0; x < 3; x++);
+bad.c:13:1: error: Use 'continue' for empty loops [epita-ctrl.empty]
+    while (y) {}
+bad.c:13:15: error: Opening brace must be on its own line [epita-braces]
+    while (y) {}
+              ^
+bad.c:14:12: error: goto not allowed [epita-keyword.goto]
+    if (x) goto end;
+           ^
+bad.c:16:10: error: Comma operator only allowed in 'for' [epita-stat.sep]
+    x = (1, 2);
+         ^
+bad.c:17:5: error: asm not allowed [epita-stat.asm]
+    asm("nop");
+    ^
+bad.c:18:1: error: Multi-line comment must open with '/*' on its own line [epita-comment.multi]
+    /* bad
+bad.c:19:1: error: '*/' must be on its own line [epita-comment.multi]
+       comment */
+bad.c:21:47: warning: Trailing whitespace [epita-file.trailing]
+    return n + arr[0] + x + y + b + c + d + e;   
+                                              ^
+bad.c:24:1: warning: #endif should have comment [epita-cpp.if]
+#endif
+bad.c:25:13: error: Opening brace must be on its own line [epita-braces]
+int f1(void){return 1;}
+            ^
+bad.c:26:14: error: Opening brace must be on its own line [epita-braces]
+int f2(void) { return ??= 2; }
+             ^
+bad.c:26:23: error: Digraph '??=' not allowed [epita-cpp.digraphs]
+int f2(void) { return ??= 2; }
+                      ^
+bad.c:28:1: error: No blank lines at end of file [epita-file.spurious]
+bad.c:28:1: error: No consecutive empty lines [epita-lines.empty]
+bad.cc:1:1: error: Use <cstdio> instead of <stdio.h> [epita-c.headers]
+#include <stdio.h>
+bad.cc:2:1: error: Same-name header should be included first [epita-cpp.include.order]
+#include "bad.hh"
+bad.cc:2:1: warning: Include groups should be separated by a blank line [epita-cpp.include.order]
+#include "bad.hh"
+bad.cc:4:7: error: Class/struct 'my_class' should be CamelCase [epita-naming.class]
+class my_class
+      ^
+bad.cc:7:1: warning: Single-argument constructor 'my_class' should be explicit [epita-decl.ctor.explicit]
+  my_class(int x);
+bad.cc:8:7: error: & should be next to type, not variable [epita-decl.ref]
+  int &get();
+      ^
+bad.cc:11:11: error: Namespace 'Foo' should be lowercase [epita-naming.namespace]
+namespace Foo {
+          ^
+bad.cc:11:15: error: Opening brace must be on its own line [epita-braces]
+namespace Foo {
+              ^
+bad.cc:12:1: error: 'f' should use () not (void) in C++ [epita-fun.proto.void.cxx]
+int f(void)
+bad.cc:14:7: error: * should be next to type, not variable [epita-decl.point]
+  int *p = NULL;
+      ^
+bad.cc:14:12: error: Use nullptr instead of NULL [epita-global.nullptr]
+  int *p = NULL;
+           ^
+bad.cc:15:12: error: Use C++ casts (static_cast, etc.) instead of C-style casts [epita-global.casts]
+  int* q = (int*)malloc(4);
+           ^
+bad.cc:15:18: error: Don't use malloc(), use new/delete or smart pointers [epita-global.memory.no_malloc]
+  int* q = (int*)malloc(4);
+                 ^
+bad.cc:16:3: error: Use std::printf instead of printf [epita-c.std_functions]
+  printf("%d", 1);
+  ^
+bad.cc:17:3: error: Don't throw literals, throw exception objects [epita-err.throw]
+  throw 42;
+  ^
+bad.cc:18:1: error: Empty body should be {} with no space [epita-braces.empty]
+  try { } catch (std::exception e) {}
+bad.cc:18:1: warning: Catch exceptions by reference [epita-err.throw.catch]
+  try { } catch (std::exception e) {}
+bad.cc:18:7: error: Opening brace must be on its own line [epita-braces]
+  try { } catch (std::exception e) {}
+      ^
+bad.cc:18:9: error: Closing brace must be on its own line [epita-braces]
+  try { } catch (std::exception e) {}
+        ^
+bad.cc:19:1: error: Switch statement should have a default case [epita-ctrl.switch]
+  switch (1) { case 1 : break; }
+bad.cc:19:14: error: Opening brace must be on its own line [epita-braces]
+  switch (1) { case 1 : break; }
+             ^
+bad.cc:19:23: error: No space before colon in case/default label [epita-ctrl.switch.padding]
+  switch (1) { case 1 : break; }
+                      ^
+bad.cc:22:1: warning: Closing brace should have comment '// namespace Foo' [epita-naming.namespace]
+}
+bad.cc:23:1: warning: Prefer 'enum class' over plain 'enum' [epita-enum.class]
+enum Color { RED };
+bad.cc:23:12: error: Opening brace must be on its own line [epita-braces]
+enum Color { RED };
+           ^
+bad.cc:24:1: error: No extern "C" in C++ code [epita-c.extern]
+extern "C" int c_fn();
+^
+bad.hh:1:1: error: Use #pragma once instead of include guards [epita-cpp.pragma.once]
+#ifndef BAD_HH
+bad.hh:4:1: warning: #endif should have comment [epita-cpp.if]
+#endif
+dos.c:1:1: error: Use Unix LF, not DOS CRLF [epita-file.dos]
+int main(void)
+dos.c:1:15: warning: Trailing whitespace [epita-file.trailing]
+int main(void)
+              ^
+dos.c:2:2: warning: Trailing whitespace [epita-file.trailing]
+{
+ ^
+dos.c:3:14: warning: Trailing whitespace [epita-file.trailing]
+    return 0;
+             ^
+dos.c:4:1: error: File must end with newline [epita-file.terminate]
+}
+sub/bad.h:1:1: error: Missing include guard (#ifndef BAD_H) [epita-cpp.guard]
+#ifndef WRONG
+sub/bad.h:4:1: error: 'k' should use (void) [epita-fun.proto.void]
+int k();
+sub/bad.h:5:1: warning: #endif should have comment [epita-cpp.if]
+#endif
+wrong.cpp:1:1: error: Use '.cc' extension instead of '.cpp' [epita-file.ext]
+
+Files: 7  Major: 49  Minor: 12

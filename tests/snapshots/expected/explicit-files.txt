@@ -1,0 +1,84 @@
+exit=1
+bad.cc:1:1: error: Use <cstdio> instead of <stdio.h> [epita-c.headers]
+#include <stdio.h>
+bad.cc:2:1: error: Same-name header should be included first [epita-cpp.include.order]
+#include "bad.hh"
+bad.cc:2:1: warning: Include groups should be separated by a blank line [epita-cpp.include.order]
+#include "bad.hh"
+bad.cc:4:7: error: Class/struct 'my_class' should be CamelCase [epita-naming.class]
+class my_class
+      ^
+bad.cc:7:1: warning: Single-argument constructor 'my_class' should be explicit [epita-decl.ctor.explicit]
+  my_class(int x);
+bad.cc:8:7: error: & should be next to type, not variable [epita-decl.ref]
+  int &get();
+      ^
+bad.cc:11:11: error: Namespace 'Foo' should be lowercase [epita-naming.namespace]
+namespace Foo {
+          ^
+bad.cc:11:15: error: Opening brace must be on its own line [epita-braces]
+namespace Foo {
+              ^
+bad.cc:12:1: error: 'f' should use () not (void) in C++ [epita-fun.proto.void.cxx]
+int f(void)
+bad.cc:14:7: error: * should be next to type, not variable [epita-decl.point]
+  int *p = NULL;
+      ^
+bad.cc:14:12: error: Use nullptr instead of NULL [epita-global.nullptr]
+  int *p = NULL;
+           ^
+bad.cc:15:12: error: Use C++ casts (static_cast, etc.) instead of C-style casts [epita-global.casts]
+  int* q = (int*)malloc(4);
+           ^
+bad.cc:15:18: error: Don't use malloc(), use new/delete or smart pointers [epita-global.memory.no_malloc]
+  int* q = (int*)malloc(4);
+                 ^
+bad.cc:16:3: error: Use std::printf instead of printf [epita-c.std_functions]
+  printf("%d", 1);
+  ^
+bad.cc:17:3: error: Don't throw literals, throw exception objects [epita-err.throw]
+  throw 42;
+  ^
+bad.cc:18:1: error: Empty body should be {} with no space [epita-braces.empty]
+  try { } catch (std::exception e) {}
+bad.cc:18:1: warning: Catch exceptions by reference [epita-err.throw.catch]
+  try { } catch (std::exception e) {}
+bad.cc:18:7: error: Opening brace must be on its own line [epita-braces]
+  try { } catch (std::exception e) {}
+      ^
+bad.cc:18:9: error: Closing brace must be on its own line [epita-braces]
+  try { } catch (std::exception e) {}
+        ^
+bad.cc:19:1: error: Switch statement should have a default case [epita-ctrl.switch]
+  switch (1) { case 1 : break; }
+bad.cc:19:14: error: Opening brace must be on its own line [epita-braces]
+  switch (1) { case 1 : break; }
+             ^
+bad.cc:19:23: error: No space before colon in case/default label [epita-ctrl.switch.padding]
+  switch (1) { case 1 : break; }
+                      ^
+bad.cc:22:1: warning: Closing brace should have comment '// namespace Foo' [epita-naming.namespace]
+}
+bad.cc:23:1: warning: Prefer 'enum class' over plain 'enum' [epita-enum.class]
+enum Color { RED };
+bad.cc:23:12: error: Opening brace must be on its own line [epita-braces]
+enum Color { RED };
+           ^
+bad.cc:24:1: error: No extern "C" in C++ code [epita-c.extern]
+extern "C" int c_fn();
+^
+dos.c:1:1: error: Use Unix LF, not DOS CRLF [epita-file.dos]
+int main(void)
+dos.c:1:15: warning: Trailing whitespace [epita-file.trailing]
+int main(void)
+              ^
+dos.c:2:2: warning: Trailing whitespace [epita-file.trailing]
+{
+ ^
+dos.c:3:14: warning: Trailing whitespace [epita-file.trailing]
+    return 0;
+             ^
+dos.c:4:1: error: File must end with newline [epita-file.terminate]
+}
+
+Files: 3  Major: 23  Minor: 8

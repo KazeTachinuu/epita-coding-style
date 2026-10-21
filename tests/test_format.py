@@ -18,16 +18,15 @@ pytestmark = pytest.mark.skipif(
 # General
 
 
-def test_format_disabled(check_result):
+def test_format_disabled(rules):
     """Format check should be skipped when disabled."""
-    violations = check_result("#include <stdio.h>\nint main(void){int x=1;return x;}\n",
-                              rule="format", preset="noformat")
-    assert not violations
+    code = "#include <stdio.h>\nint main(void){int x=1;return x;}\n"
+    assert "format" not in rules(code, preset="noformat")
 
 
-def test_format_is_major(format_check):
+def test_format_is_major(lint):
     """Format violations should be MAJOR severity."""
-    _, fmt = format_check("int main(void){return 0;}\n", ".c")
+    fmt = [v for v in lint("int main(void){return 0;}\n") if v.rule == "format"]
     assert fmt
     assert all(v.severity == Severity.MAJOR for v in fmt)
 
@@ -84,9 +83,9 @@ void foo(void)
     (C_GOOD_HEADER, ".h"),
     (C_GOOD_ALLMAN, ".c"),
 ], ids=["main", "pointer-right", "header", "allman-braces"])
-def test_c_format_pass(format_passes, code, suffix):
+def test_c_format_pass(rules, code, suffix):
     """C: well-formatted code should pass."""
-    format_passes(code, suffix)
+    assert "format" not in rules(code, suffix)
 
 
 # C: negative (should fail)
@@ -132,9 +131,9 @@ void foo(void)
     (C_BAD_HEADER, ".h"),
     (C_BAD_MISSING_SPACES, ".c"),
 ], ids=["kr-braces", "pointer-left", "header", "missing-spaces"])
-def test_c_format_fail(format_fails, code, suffix):
+def test_c_format_fail(rules, code, suffix):
     """C: badly formatted code should fail."""
-    format_fails(code, suffix)
+    assert "format" in rules(code, suffix)
 
 
 # C++: positive (should pass)
@@ -211,9 +210,9 @@ void foo()
     (CXX_GOOD_HXX_HEADER, ".hxx"),
     (CXX_GOOD_ALLMAN, ".cc"),
 ], ids=["main", "pointer-left", "reference-left", "hh-header", "hxx-header", "allman-braces"])
-def test_cxx_format_pass(format_passes, code, suffix):
+def test_cxx_format_pass(rules, code, suffix):
     """C++: well-formatted code should pass."""
-    format_passes(code, suffix)
+    assert "format" not in rules(code, suffix)
 
 
 # C++: negative (should fail)
@@ -267,28 +266,24 @@ void foo()
     (CXX_BAD_HH_HEADER, ".hh"),
     (CXX_BAD_MISSING_SPACES, ".cc"),
 ], ids=["kr-braces", "pointer-right", "reference-right", "hh-header", "missing-spaces"])
-def test_cxx_format_fail(format_fails, code, suffix):
+def test_cxx_format_fail(rules, code, suffix):
     """C++: badly formatted code should fail."""
-    format_fails(code, suffix)
+    assert "format" in rules(code, suffix)
 
 
 # Cross-language: pointer alignment divergence
 
 
-def test_pointer_right_passes_c_fails_cxx(format_passes, format_fails):
+def test_pointer_right_passes_c_fails_cxx(rules):
     """int *x is correct in C but wrong in C++."""
-    c_code = "void foo(void)\n{\n    int *x;\n}\n"
-    cxx_code = "void foo()\n{\n    int *x = nullptr;\n}\n"
-    format_passes(c_code, ".c", "int *x should pass in C")
-    format_fails(cxx_code, ".cc", "int *x should fail in C++")
+    assert "format" not in rules("void foo(void)\n{\n    int *x;\n}\n", ".c")
+    assert "format" in rules("void foo()\n{\n    int *x = nullptr;\n}\n", ".cc")
 
 
-def test_pointer_left_passes_cxx_fails_c(format_passes, format_fails):
+def test_pointer_left_passes_cxx_fails_c(rules):
     """int* x is correct in C++ but wrong in C."""
-    c_code = "void foo(void)\n{\n    int* x;\n}\n"
-    cxx_code = "void foo()\n{\n    int* x = nullptr;\n}\n"
-    format_fails(c_code, ".c", "int* x should fail in C")
-    format_passes(cxx_code, ".cc", "int* x should pass in C++")
+    assert "format" in rules("void foo(void)\n{\n    int* x;\n}\n", ".c")
+    assert "format" not in rules("void foo()\n{\n    int* x = nullptr;\n}\n", ".cc")
 
 
 def test_batch_reports_each_file(tmp_path):
