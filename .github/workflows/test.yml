@@ -21,7 +21,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Ruff
-        run: uvx ruff check --select F401,F811,F841,ARG src/ tests/
+        run: uvx ruff check --select F401,F811,F841,ARG,I src/ tests/
 
   test:
     runs-on: ubuntu-latest
@@ -32,22 +32,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync
 
       - name: Install clang-format and bats
         run: sudo apt-get update && sudo apt-get install -y clang-format bats
 
       - name: Run unit tests
-        run: uv run pytest tests/ --ignore=tests/integration -v
+        run: uv run pytest
 
       - name: Run integration tests
         run: bats tests/integration/test_cli.bats

@@ -41,18 +41,17 @@ dependencies = [
 epita-coding-style = "epita_coding_style:main"
 
 [project.urls]
-Homepage = "https://github.com/KazeTachinuu/coding-style"
-Repository = "https://github.com/KazeTachinuu/coding-style"
-Issues = "https://github.com/KazeTachinuu/coding-style/issues"
+Homepage = "https://github.com/KazeTachinuu/epita-coding-style"
+Repository = "https://github.com/KazeTachinuu/epita-coding-style"
+Issues = "https://github.com/KazeTachinuu/epita-coding-style/issues"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/epita_coding_style"]
-include = ["src/epita_coding_style/.clang-format*"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -64,7 +63,3 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
-python_files = ["test_*.py"]
-python_functions = ["test_*"]
-addopts = "-v"
