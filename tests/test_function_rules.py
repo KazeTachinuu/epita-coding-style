@@ -1,7 +1,9 @@
 """Tests for function-level rules."""
 
-import pytest
 from textwrap import dedent
+
+import pytest
+
 from epita_coding_style import Severity
 
 # Multi-line function signatures

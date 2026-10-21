@@ -1,8 +1,12 @@
 """Tests for clang-format rule with separate C and C++ configs."""
 
 import shutil
+import subprocess
+
 import pytest
-from epita_coding_style.core import Severity
+
+from epita_coding_style import Config, Severity, check_file
+from epita_coding_style.checks.clang_format import check_clang_format
 
 # Skip all tests if clang-format not installed
 pytestmark = pytest.mark.skipif(
@@ -287,15 +291,34 @@ def test_pointer_left_passes_cxx_fails_c(format_passes, format_fails):
     format_passes(cxx_code, ".cc", "int* x should pass in C++")
 
 
-def test_batch_matches_per_file(tmp_path):
-    from epita_coding_style import check_file, Config
-    from epita_coding_style.checks import check_clang_format_batch
+def test_batch_reports_each_file(tmp_path):
     bad = tmp_path / "bad.c"
     bad.write_text("int main(void){return 0;}\n")
     clean = tmp_path / "clean.c"
     clean.write_text("int main(void)\n{\n    return 0;\n}\n")
-    cfg = Config()
-    batch = check_clang_format_batch([str(bad), str(clean)], cfg)
-    per_file = [v for v in check_file(str(bad), cfg) if v.rule == "format"]
-    assert [v.message for v in batch[str(bad)]] == [v.message for v in per_file]
-    assert str(clean) not in batch
+    result = check_clang_format([str(bad), str(clean)], Config())
+    assert [v.rule for v in result[str(bad)]] == ["format"]
+    assert str(clean) not in result
+
+
+def test_invalid_clang_format_config_is_reported(tmp_path):
+    (tmp_path / ".clang-format").write_text("Foo: [[[\n")
+    src = tmp_path / "a.c"
+    src.write_text("int main(void){return 0;}\n")
+    [v] = check_clang_format([str(src)], Config())[str(src)]
+    assert v.message.startswith("clang-format failed")
+
+
+def test_unreadable_file_reported_once(tmp_path):
+    """A missing file is a file.read error only, never also a format error."""
+    missing = str(tmp_path / "missing.c")
+    assert [v.rule for v in check_file(missing, Config())] == ["file.read"]
+
+
+def test_hung_clang_format_is_skipped(tmp_path, monkeypatch):
+    def hang(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+    monkeypatch.setattr(subprocess, "run", hang)
+    src = tmp_path / "a.c"
+    src.write_text("int main(void){return 0;}\n")
+    assert check_clang_format([str(src)], Config()) == {}

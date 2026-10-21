@@ -1,7 +1,8 @@
 """Tests for preprocessor rules."""
 
-import pytest
 from textwrap import dedent
+
+import pytest
 
 GUARD_OK = dedent("""\
     #ifndef TEST_H

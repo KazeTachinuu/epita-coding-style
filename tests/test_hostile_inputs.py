@@ -1,8 +1,9 @@
 """Hostile input handling: the checker must never crash on garbage."""
 
 import pytest
-from epita_coding_style import check_file, Config
-from epita_coding_style.checker import find_files
+
+from epita_coding_style import Config, check_file
+from epita_coding_style.files import find_files
 
 
 @pytest.mark.parametrize("data", [
@@ -39,3 +40,9 @@ def test_swap_and_hidden_files_skipped(tmp_path):
     (tmp_path / "real.c").write_text("int x;\n")
     files = find_files([str(tmp_path)])
     assert files == [str(tmp_path / "real.c")]
+
+
+def test_check_file_ignores_non_source(tmp_path):
+    path = tmp_path / "notes.txt"
+    path.write_text("hello\n")
+    assert check_file(str(path), Config()) == []

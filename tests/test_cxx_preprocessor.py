@@ -1,8 +1,8 @@
 """Tests for CXX preprocessor rules."""
 
-import pytest
 from textwrap import dedent
 
+import pytest
 
 # cpp.pragma.once
 
@@ -65,7 +65,7 @@ HEADER_WITH_HXX_AT_END = '#pragma once\n\n#include <map>\n\nclass Foo {};\n\n#in
 
 
 def test_cpp_include_order_hh_hxx_at_end(check_cxx):
-    assert check_cxx(HEADER_WITH_HXX_AT_END, "cpp.include.order", suffix=".hh") == False
+    assert not check_cxx(HEADER_WITH_HXX_AT_END, "cpp.include.order", suffix=".hh")
 
 
 # cpp.include.order (alphabetical)

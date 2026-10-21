@@ -1,8 +1,15 @@
 """Tests for CXX config handling: idempotency, with_cxx(), language detection."""
 
 import pytest
-from epita_coding_style import Config, Lang, lang_from_path
 
+from epita_coding_style import (
+    RULES,
+    Config,
+    ConfigError,
+    Lang,
+    lang_from_path,
+    load_config,
+)
 
 # lang_from_path
 
@@ -76,7 +83,7 @@ def test_with_cxx_respects_user_disabled_cxx_rule():
     """User disabling a CXX rule via config should persist through with_cxx()."""
     cfg = Config()
     cfg.rules["global.casts"] = False
-    cfg._user_rules.add("global.casts")
+    cfg.user_rules.add("global.casts")
     assert not cfg.with_cxx().is_enabled("global.casts")
 
 
@@ -84,7 +91,7 @@ def test_with_cxx_respects_user_enabled_c_only_rule():
     """User enabling a C-only rule via config should persist through with_cxx()."""
     cfg = Config()
     cfg.rules["cpp.guard"] = True
-    cfg._user_rules.add("cpp.guard")
+    cfg.user_rules.add("cpp.guard")
     assert cfg.with_cxx().is_enabled("cpp.guard")
 
 
@@ -108,7 +115,7 @@ def test_with_cxx_preserves_user_max_lines():
     """Regression: user-specified max_lines must not be overridden to 50."""
     cfg = Config()
     cfg.max_lines = 25
-    cfg._user_limits.add("max_lines")
+    cfg.user_limits.add("max_lines")
     cxx = cfg.with_cxx()
     assert cxx.max_lines == 25
 
@@ -134,76 +141,67 @@ def test_c_rules_enabled_by_default(rule):
 
 
 def test_rules_table_well_formed():
-    from epita_coding_style.config import RULES
     for name, (desc, category, lang) in RULES.items():
         assert desc and category, name
         assert lang in ("c", "cxx", "both"), name
 
 
 def test_default_rules_match_registry():
-    from epita_coding_style.config import RULES
     cfg = Config()
     assert set(cfg.rules) == set(RULES)
     for name, (_, _, lang) in RULES.items():
         assert cfg.rules[name] == (lang != "cxx"), name
 
 
-def test_every_rule_has_a_category_slot():
-    from epita_coding_style.config import RULES
-    from epita_coding_style.checker import CATEGORY_ORDER
-    for name, (_, category, _) in RULES.items():
-        assert category in CATEGORY_ORDER, name
-
-
 # config validation
 
 
-def test_config_unknown_rule_errors(tmp_path, monkeypatch):
-    from epita_coding_style import load_config
-    from epita_coding_style.config import ConfigError
-    monkeypatch.chdir(tmp_path)
+def test_config_unknown_rule_errors(tmp_path):
     (tmp_path / ".epita-style.toml").write_text('[rules]\n"keyword.gotoo" = false\n')
     with pytest.raises(ConfigError, match="unknown rule"):
         load_config()
 
 
-def test_config_unknown_key_errors(tmp_path, monkeypatch):
-    from epita_coding_style import load_config
-    from epita_coding_style.config import ConfigError
-    monkeypatch.chdir(tmp_path)
+def test_config_unknown_key_errors(tmp_path):
     (tmp_path / ".epita-style.toml").write_text("max_linez = 40\n")
     with pytest.raises(ConfigError, match="unknown key"):
         load_config()
 
 
-def test_config_malformed_toml_errors(tmp_path, monkeypatch):
-    from epita_coding_style import load_config
-    from epita_coding_style.config import ConfigError
-    monkeypatch.chdir(tmp_path)
+def test_config_malformed_toml_errors(tmp_path):
     (tmp_path / ".epita-style.toml").write_text("[rules\nbad")
     with pytest.raises(ConfigError, match="invalid TOML"):
         load_config()
 
 
-def test_config_string_limit_errors(tmp_path, monkeypatch):
-    from epita_coding_style import load_config
-    from epita_coding_style.config import ConfigError
-    monkeypatch.chdir(tmp_path)
+def test_config_string_limit_errors(tmp_path):
     (tmp_path / ".epita-style.toml").write_text('max_lines = "40"\n')
-    with pytest.raises(ConfigError, match="must be an integer"):
+    with pytest.raises(ConfigError, match="must be a non-negative integer"):
         load_config()
 
 
 def test_config_missing_explicit_path_errors(tmp_path):
-    from epita_coding_style import load_config
-    from epita_coding_style.config import ConfigError
     with pytest.raises(ConfigError, match="not found"):
         load_config(config_path=tmp_path / "nope.toml")
 
 
-def test_explicit_max_lines_survives_cxx(tmp_path, monkeypatch):
-    from epita_coding_style import load_config
-    monkeypatch.chdir(tmp_path)
+def test_config_directory_errors(tmp_path):
+    with pytest.raises(ConfigError, match="cannot read"):
+        load_config(config_path=tmp_path)
+
+
+def test_config_autodetect_skips_directories(tmp_path):
+    (tmp_path / ".epita-style").mkdir()
+    (tmp_path / ".epita-style.toml").write_text("max_lines = 5\n")
+    assert load_config().max_lines == 5
+
+
+def test_unknown_preset_errors():
+    with pytest.raises(ConfigError, match="unknown preset"):
+        load_config(preset="nope")
+
+
+def test_explicit_max_lines_survives_cxx(tmp_path):
     (tmp_path / ".epita-style.toml").write_text("max_lines = 30\n")
     assert load_config().with_cxx().max_lines == 30
 
@@ -213,17 +211,8 @@ def test_default_max_lines_bumps_for_cxx():
 
 
 def test_config_found_from_subdirectory(tmp_path, monkeypatch):
-    from epita_coding_style import load_config
     (tmp_path / ".epita-style.toml").write_text("max_lines = 5\n")
     sub = tmp_path / "src"
     sub.mkdir()
     monkeypatch.chdir(sub)
     assert load_config().max_lines == 5
-
-
-def test_duplicate_paths_deduped(tmp_path, monkeypatch):
-    from epita_coding_style.checker import find_files
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "a.c").write_text("int x;\n")
-    assert find_files([str(tmp_path), str(tmp_path / "a.c"), "a.c"]) \
-        == [str(tmp_path / "a.c")]

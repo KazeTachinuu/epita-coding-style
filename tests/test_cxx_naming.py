@@ -1,8 +1,8 @@
 """Tests for CXX naming rules."""
 
-import pytest
 from textwrap import dedent
 
+import pytest
 
 # naming.class
 

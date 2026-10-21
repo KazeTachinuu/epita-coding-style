@@ -4,3 +4,4 @@
   entry: epita-coding-style
   language: python
   files: \.(c|h|cc|hh|hxx|cpp|hpp)$
+  require_serial: true

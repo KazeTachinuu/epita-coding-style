@@ -2,7 +2,6 @@
 
 import pytest
 
-
 # global.casts
 
 C_STYLE_CAST = "void foo() { auto x = (int)3.14; }\n"

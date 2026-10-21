@@ -1,4 +1,6 @@
-"""Configuration system for EPITA C/C++ Coding Style Checker."""
+"""Rules, presets, and configuration loading."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -71,9 +73,14 @@ RULES: dict[str, tuple[str, str, str]] = {
     "enum.class": ("Prefer enum class over plain enum", "CXX-Writing", "cxx"),
 }
 
-RULES_META: dict[str, tuple[str, str]] = {
-    name: (desc, cat) for name, (desc, cat, _) in RULES.items()
+LIMITS: dict[str, str] = {
+    "max_lines": "Max lines per function body (C++ default: 50)",
+    "max_args": "Max arguments per function",
+    "max_funcs": "Max exported functions per file",
+    "max_globals": "Max exported globals per file",
+    "max_casts": "Max explicit casts across all checked C files",
 }
+
 _CXX_RULES = frozenset(n for n, (_, _, lang) in RULES.items() if lang == "cxx")
 _C_ONLY_RULES = frozenset(n for n, (_, _, lang) in RULES.items() if lang == "c")
 
@@ -90,33 +97,36 @@ class Config:
     max_args: int = 4
     max_funcs: int = 10
     max_globals: int = 1
+    max_casts: int = 0
 
-    _user_rules: set[str] = field(default_factory=set)
-    _user_limits: set[str] = field(default_factory=set)
+    user_rules: set[str] = field(default_factory=set)
+    user_limits: set[str] = field(default_factory=set)
 
     rules: dict[str, bool] = field(default_factory=lambda: {
         name: lang != "cxx" for name, (_, _, lang) in RULES.items()
     })
 
     def is_enabled(self, rule: str) -> bool:
-        """Check if a rule is enabled."""
         return self.rules.get(rule, True)
 
-    def with_cxx(self) -> "Config":
+    def with_cxx(self) -> Config:
         """Return a copy with CXX rules enabled and C-only rules disabled."""
         rules = dict(self.rules)
-        for rule in _CXX_RULES - self._user_rules:
+        for rule in _CXX_RULES - self.user_rules:
             rules[rule] = True
-        for rule in _C_ONLY_RULES - self._user_rules:
+        for rule in _C_ONLY_RULES - self.user_rules:
             rules[rule] = False
-        max_lines = self.max_lines if "max_lines" in self._user_limits else 50
+        max_lines = self.max_lines if "max_lines" in self.user_limits else 50
         return replace(self, rules=rules, max_lines=max_lines,
-                       _user_rules=set(self._user_rules),
-                       _user_limits=set(self._user_limits))
+                       user_rules=set(self.user_rules),
+                       user_limits=set(self.user_limits))
 
 
 # Presets (override defaults)
 PRESETS: dict[str, dict[str, Any]] = {
+    "ppex1": {
+        "max_casts": 5,
+    },
     "42sh": {
         "max_lines": 40,
         "rules": {
@@ -140,83 +150,60 @@ def load_config(
     preset: str | None = None,
     **overrides: Any,
 ) -> Config:
-    """
-    Load configuration with priority: CLI overrides > config file > preset > defaults.
-
-    Args:
-        config_path: Path to .toml config file
-        preset: Preset name ("epita", "42sh")
-        **overrides: CLI overrides (max_lines, max_args, etc.)
-    """
+    """Build a Config: CLI overrides > config file > preset > defaults."""
     cfg = Config()
-
-    # 1. Apply CLI preset first (lowest priority for presets)
-    if preset and preset in PRESETS:
-        _apply_dict(cfg, PRESETS[preset], f"preset '{preset}'")
-
-    # 2. Load config file
-    file_data: dict[str, Any] | None = None
-    source = ""
-    if config_path:
-        if not config_path.exists():
-            raise ConfigError(f"config file not found: {config_path}")
-        file_data, source = _load_toml(config_path), str(config_path)
-    else:
-        # Auto-detect config files, walking up from cwd to the filesystem root
-        cwd = Path.cwd()
-        for directory in (cwd, *cwd.parents):
-            for name in (".epita-style", ".epita-style.toml", "epita-style.toml"):
-                p = directory / name
-                if p.exists():
-                    file_data, source = _load_toml(p), str(p)
-                    break
-            if file_data is not None:
-                break
-            pyproject = directory / "pyproject.toml"
-            if pyproject.exists():
-                data = _load_toml(pyproject)
-                if "tool" in data and "epita-coding-style" in data["tool"]:
-                    file_data, source = data["tool"]["epita-coding-style"], str(pyproject)
-                    break
-
-    # 2b. Apply preset from config file (if no CLI preset), then apply config values
-    if file_data:
-        file_preset = file_data.get("preset")
-        if file_preset is not None:
-            if file_preset not in PRESETS:
-                raise ConfigError(f"{source}: unknown preset '{file_preset}' "
-                                  f"(choose from: {', '.join(PRESETS)})")
-            if not preset:
-                _apply_dict(cfg, PRESETS[file_preset], source)
-        _apply_dict(cfg, file_data, source)
-
-    # 3. Apply CLI overrides
-    for key, val in overrides.items():
-        if val is not None:
-            setattr(cfg, key, val)
-            cfg._user_limits.add(key)
-
+    file_data, source = _find_config(config_path)
+    if preset:
+        _apply_dict(cfg, _preset(preset, "preset"), f"preset '{preset}'")
+    elif "preset" in file_data:
+        _apply_dict(cfg, _preset(file_data["preset"], source), source)
+    _apply_dict(cfg, file_data, source)
+    _apply_dict(cfg, {k: v for k, v in overrides.items() if v is not None}, "override")
     return cfg
 
 
-_LIMIT_KEYS = ("max_lines", "max_args", "max_funcs", "max_globals")
+def _find_config(config_path: Path | None) -> tuple[dict[str, Any], str]:
+    """The explicit config file, or the first one found walking up from cwd."""
+    if config_path:
+        if not config_path.exists():
+            raise ConfigError(f"config file not found: {config_path}")
+        return _load_toml(config_path), str(config_path)
+    cwd = Path.cwd()
+    for directory in (cwd, *cwd.parents):
+        for name in (".epita-style", ".epita-style.toml", "epita-style.toml"):
+            if (p := directory / name).is_file():
+                return _load_toml(p), str(p)
+        if (p := directory / "pyproject.toml").is_file():
+            tool = _load_toml(p).get("tool", {})
+            if "epita-coding-style" in tool:
+                return tool["epita-coding-style"], str(p)
+    return {}, ""
 
 
 def _load_toml(path: Path) -> dict[str, Any]:
-    """Load TOML file, raising ConfigError on syntax errors."""
+    """Load a TOML file, raising ConfigError if it cannot be read or parsed."""
     try:
         with open(path, "rb") as f:
             return tomllib.load(f)
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(f"{path}: invalid TOML: {e}") from e
+    except OSError as e:
+        raise ConfigError(f"{path}: cannot read: {e.strerror or e}") from e
+
+
+def _preset(name: Any, source: str) -> dict[str, Any]:
+    if name not in PRESETS:
+        raise ConfigError(f"{source}: unknown preset '{name}' "
+                          f"(choose from: {', '.join(PRESETS)})")
+    return PRESETS[name]
 
 
 def _apply_dict(cfg: Config, data: dict[str, Any], source: str) -> None:
     """Apply validated config values; reject unknown keys and bad types."""
     for key, val in data.items():
         if key == "preset":
-            continue  # handled by load_config
-        if key == "rules":
+            _preset(val, source)  # applied first by load_config
+        elif key == "rules":
             if not isinstance(val, dict):
                 raise ConfigError(f"{source}: [rules] must be a table")
             for rule, enabled in val.items():
@@ -226,11 +213,11 @@ def _apply_dict(cfg: Config, data: dict[str, Any], source: str) -> None:
                 if not isinstance(enabled, bool):
                     raise ConfigError(f"{source}: rule '{rule}' must be true or false")
             cfg.rules.update(val)
-            cfg._user_rules.update(val.keys())
-        elif key in _LIMIT_KEYS:
-            if isinstance(val, bool) or not isinstance(val, int):
-                raise ConfigError(f"{source}: {key} must be an integer")
+            cfg.user_rules.update(val.keys())
+        elif key in LIMITS:
+            if isinstance(val, bool) or not isinstance(val, int) or val < 0:
+                raise ConfigError(f"{source}: {key} must be a non-negative integer")
             setattr(cfg, key, val)
-            cfg._user_limits.add(key)
+            cfg.user_limits.add(key)
         else:
             raise ConfigError(f"{source}: unknown key '{key}'")

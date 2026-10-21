@@ -1,7 +1,8 @@
 """Tests for control structure rules."""
 
-import pytest
 from textwrap import dedent
+
+import pytest
 
 
 @pytest.mark.parametrize("code,should_fail", [

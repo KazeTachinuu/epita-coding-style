@@ -1,7 +1,11 @@
 """Tests for braces rules (Allman style)."""
 
-import pytest
+import shutil
 from textwrap import dedent
+
+import pytest
+
+from epita_coding_style import Config, check_file
 
 # Valid Allman style
 ALLMAN = dedent("""\
@@ -130,9 +134,6 @@ def test_braces_char_literal_with_violation(check):
 
 def test_braces_fallback_when_clang_format_missing(tmp_path, monkeypatch):
     """Without clang-format, check_braces takes over instead of silence."""
-    import shutil
-    from epita_coding_style import check_file, Config
-
     monkeypatch.setattr(shutil, "which", lambda _: None)
     path = tmp_path / "test.c"
     path.write_text("void f(void) {\n    return;\n}\n")

@@ -1,8 +1,8 @@
 """Tests for CXX control flow rules."""
 
-import pytest
 from textwrap import dedent
 
+import pytest
 
 # ctrl.switch
 

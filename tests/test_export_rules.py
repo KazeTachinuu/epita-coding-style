@@ -1,8 +1,10 @@
 """Tests for export rules."""
 
-import pytest
 from textwrap import dedent
-from epita_coding_style import Severity
+
+import pytest
+
+from epita_coding_style import Config, Severity, check_file
 
 
 def _make_funcs(n, static=False):
@@ -170,7 +172,6 @@ def test_export_other_is_major(check_result):
 
 def test_export_other_max_globals_zero(tmp_path):
     """Regression: max_globals=0 must not crash with IndexError."""
-    from epita_coding_style import check_file, Config
     path = tmp_path / "test.c"
     path.write_text("int a;\n")
     cfg = Config()

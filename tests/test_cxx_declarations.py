@@ -1,8 +1,8 @@
 """Tests for CXX declaration rules."""
 
-import pytest
 from textwrap import dedent
 
+import pytest
 
 # decl.ref
 

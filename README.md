@@ -1,121 +1,104 @@
-# EPITA C/C++ Coding Style Checker
+# epita-coding-style
 
-A fast C (.c/.h) and C++ (.cc/.hh/.hxx) linter for EPITA coding style rules: AST-based checks via [tree-sitter](https://tree-sitter.github.io/), `clang-format` integration with language-specific configs, TOML/preset/CLI configuration, and pre-commit support.
+Linter for the EPITA C and C++ coding style: tree-sitter checks plus `clang-format`.
 
-## Installation
+## Install
 
 ```bash
 pipx install epita-coding-style
 ```
 
-Requires Python >= 3.10, and `clang-format` on PATH for the format check
-(skipped with a warning otherwise).
+Requires Python >= 3.10. The format check needs `clang-format` on `PATH`;
+without it the check is skipped with a warning.
 
-## Quick Start
+## Usage
 
 ```bash
-epita-coding-style src/           # Check files/directories
-epita-coding-style --list-rules   # List all rules with descriptions
-epita-coding-style --show-config  # Show current configuration
-epita-coding-style --help         # Full usage info
+epita-coding-style src/                      # check a directory recursively
+epita-coding-style main.c list.h             # check specific files
+epita-coding-style --preset 42sh src/        # use a preset
+git ls-files '*.c' | epita-coding-style -   # read paths from stdin
+epita-coding-style --list-rules              # list every rule
 ```
-
-## Example Output
 
 ```
 $ epita-coding-style src/
-src/rbtree.c:1:1: error: No blank lines at start of file [epita-file.spurious]
+src/list.c:5:1: error: 'list_sum' has 5 args (max 4) [epita-fun.arg.count]
+int list_sum(int *values, int len, int start, int step, int max)
+src/list.c:7:5: error: One declaration per line [epita-decl.single]
+    int sum = 0, i;
+    ^
+src/list.c:8:1: error: 1 line needs formatting [epita-format]
 
-src/rbtree.c:307:1: error: 'rb_delete_cases' has 5 args (max 4) [epita-fun.arg.count]
-static void rb_delete_cases(struct rb_node **node, struct rb_node **tmp,
-src/rbtree.c:12:1: error: 2 exported globals (max 1) [epita-export.other]
-src/rbtree.c:1:1: error: 36 lines need formatting [epita-format]
+Files: 1  Major: 3  Minor: 0
 
-Files: 1  Major: 4  Minor: 0
-
-Fix formatting: clang-format -i src/rbtree.c
+Fix formatting:
+  clang-format --style=file:.../epita_coding_style/.clang-format-c -i src/list.c
 ```
 
-## Supported File Extensions
+## What gets scanned
 
-| Language | Source | Header |
-|----------|--------|--------|
-| C        | `.c`   | `.h`   |
-| C++      | `.cc`  | `.hh`, `.hxx` |
+| Language | Extensions |
+|----------|------------|
+| C        | `.c`, `.h` |
+| C++      | `.cc`, `.hh`, `.hxx` (`.cpp`/`.hpp` are checked but flagged by `file.ext`) |
 
-C++ files using `.cpp` / `.hpp` will be checked but flagged with a `file.ext` violation.
+Directories are scanned recursively. Hidden files and directories are skipped,
+and inside a git repo so is everything git ignores (`.gitignore`,
+`.git/info/exclude`, global excludes). Files named explicitly are always checked.
 
 ## Configuration
 
-Configuration is auto-detected from (in order):
-- `.epita-style`
-- `.epita-style.toml`
-- `epita-style.toml`
-- `[tool.epita-coding-style]` in `pyproject.toml`
+The first config found in the current directory or any parent is used:
+`.epita-style`, `.epita-style.toml`, `epita-style.toml`, or the
+`[tool.epita-coding-style]` table of `pyproject.toml`. `--config FILE` picks one explicitly.
 
-**Priority:** CLI flags > config file > preset > defaults
+```toml
+preset = "42sh"
+max_lines = 40
 
-### Generate a Config File
+[rules]
+"keyword.goto" = false
+"cast" = false
+```
+
+Priority: CLI flags > config file > preset > defaults.
+
+| Preset     | Effect |
+|------------|--------|
+| `ppex1`    | `max_casts = 5` |
+| `42sh`     | `max_lines = 40`, disables `keyword.goto`, `cast` |
+| `noformat` | same as `42sh`, also disables `format` |
+
+| Limit         | C  | C++ | Flag            |
+|---------------|----|-----|-----------------|
+| `max_lines`   | 30 | 50  | `--max-lines`   |
+| `max_args`    | 4  | 4   | `--max-args`    |
+| `max_funcs`   | 10 | -   | `--max-funcs`   |
+| `max_globals` | 1  | -   | `--max-globals` |
+| `max_casts`   | 0  | -   | `--max-casts`   |
+
+`max_casts` is a budget shared by all C files checked in one run, so run it on
+the whole project (`epita-coding-style .`). Over budget, every cast is reported.
+`"cast" = false` allows any number of casts.
+
+`--show-config` prints the effective configuration as loadable TOML: settings
+you changed are live lines, everything else is a commented-out default.
 
 ```bash
 epita-coding-style --show-config --no-color > .epita-style.toml
 ```
 
-This outputs a complete, commented TOML config you can customize.
-
-### Presets
-
-```bash
-epita-coding-style --preset 42sh src/      # 40 lines, goto/cast allowed
-epita-coding-style --preset noformat src/  # Same + skip clang-format
-```
-
-### Example Config
-
-```toml
-# .epita-style.toml
-max_lines = 40
-
-[rules]
-"keyword.goto" = false  # Allow goto
-"cast" = false          # Allow casts
-```
-
-The same keys work under `[tool.epita-coding-style]` in `pyproject.toml`.
-
-### Limits
-
-| Setting | Default (C) | Default (C++) | Description |
-|---------|-------------|---------------|-------------|
-| `max_lines` | 30 | 50 | Max lines per function body |
-| `max_args` | 4 | 4 | Max arguments per function |
-| `max_funcs` | 10 | n/a | Max exported functions per file (C only) |
-| `max_globals` | 1 | n/a | Max exported globals per file (C only) |
-
 ## clang-format
 
-The `format` rule uses `clang-format` to check code formatting. Requires `clang-format` to be installed.
+For each file, the nearest config from the file's directory up to the root is
+used: `.clang-format-c` (C) or `.clang-format-cxx` (C++), then `.clang-format`.
+If none is found, the bundled EPITA config for that language is used.
+Disable with `"format" = false` or `--preset noformat`.
 
-The checker uses language-specific configs:
-- **C**: looks for `.clang-format-c`, then `.clang-format`
-- **C++**: looks for `.clang-format-cxx`, then `.clang-format`
-
-It searches from the file's directory up to root, falling back to the bundled EPITA configs.
-
-To disable: set `"format" = false` in your config, or use `--preset noformat`.
-
-## Editor Integration
-
-Neovim: [epita-nvim-lint](https://github.com/KazeTachinuu/epita-nvim-lint)
-lints on save via nvim-lint.
-
-Any editor that parses GCC-style diagnostics (`file:line:col: error: ...`)
-works out of the box, e.g. Vim's `:make` with `makeprg=epita-coding-style\ %`.
-
-## Pre-commit Hook
+## Pre-commit
 
 ```yaml
-# .pre-commit-config.yaml
 repos:
   - repo: https://github.com/KazeTachinuu/epita-coding-style
     rev: v3.4.0
@@ -124,6 +107,34 @@ repos:
         args: [--preset, 42sh]  # optional
 ```
 
-Update the pinned `rev` with `pre-commit autoupdate`.
+A commit only checks the staged files, so `max_casts` counts the casts in those
+files alone. To enforce the budget on the whole project, check it all:
 
-With the tool already installed, `./setup-hooks.sh` sets up a local hook instead.
+```yaml
+      - id: epita-coding-style
+        args: [--preset, ppex1, .]
+        pass_filenames: false
+```
+
+## Editor integration
+
+Neovim: [epita-nvim-lint](https://github.com/KazeTachinuu/epita-nvim-lint).
+Diagnostics are GCC-style (`file:line:col: error: ...`), so any editor that
+parses them works, e.g. Vim with `makeprg=epita-coding-style\ %`.
+Checked one file at a time, `max_casts` only counts that file's casts.
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0    | no major violations |
+| 1    | major violations found |
+| 2    | usage, config or file error |
+
+## Environment
+
+| Variable | Effect |
+|----------|--------|
+| `NO_COLOR` | disable colors |
+| `FORCE_COLOR` | force colors when not a terminal |
+| `EPITA_STYLE_NO_UPDATE_CHECK` | disable the daily PyPI version check (only runs in a terminal, never in CI) |

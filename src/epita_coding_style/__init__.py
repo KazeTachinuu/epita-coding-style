@@ -2,21 +2,25 @@
 
 from importlib.metadata import version
 
+# Defined before the submodule imports: cli and update import it from here.
 __version__ = version("epita-coding-style")
 
-from .core import Violation, Severity, Lang, lang_from_path
-from .config import Config, load_config, PRESETS
-from .checker import check_file, main
+from .cli import main
+from .config import PRESETS, RULES, Config, ConfigError, load_config
+from .lint import check_file
+from .model import Lang, Severity, Violation, lang_from_path
 
 __all__ = [
     "check_file",
+    "Config",
+    "ConfigError",
+    "PRESETS",
+    "RULES",
+    "load_config",
     "Violation",
     "Severity",
     "Lang",
     "lang_from_path",
     "main",
-    "Config",
-    "load_config",
-    "PRESETS",
     "__version__",
 ]

@@ -1,8 +1,8 @@
 """Tests for file.ext rule (wrong C++ file extension)."""
 
 import pytest
-from epita_coding_style import Severity
 
+from epita_coding_style import Severity
 
 # Test data
 

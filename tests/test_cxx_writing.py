@@ -1,8 +1,8 @@
 """Tests for CXX writing rules."""
 
-import pytest
 from textwrap import dedent
 
+import pytest
 
 # braces.empty
 
