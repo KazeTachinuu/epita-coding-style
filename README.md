@@ -101,7 +101,7 @@ Disable with `"format" = false` or `--preset noformat`.
 ```yaml
 repos:
   - repo: https://github.com/KazeTachinuu/epita-coding-style
-    rev: v3.4.0
+    rev: v3.5.0
     hooks:
       - id: epita-coding-style
         args: [--preset, 42sh]  # optional
