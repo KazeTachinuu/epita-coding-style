@@ -37,7 +37,6 @@ RULES: dict[str, tuple[str, str, str]] = {
     "stat.sep": ("No comma operator outside 'for'", "Declarations", "c"),
     "ctrl.empty": ("Use 'continue' in empty loop bodies", "Control", "both"),
     "keyword.goto": ("No goto statements", "Strict", "c"),
-    "cast": ("No explicit casts", "Strict", "c"),
     "format": ("clang-format compliance check", "Formatting", "both"),
     "file.ext": ("C++ files must use .cc/.hh/.hxx extensions (not .cpp/.hpp)", "CXX-File", "cxx"),
     "cpp.pragma.once": ("Use #pragma once instead of include guards", "CXX-Preprocessor", "cxx"),
@@ -90,6 +89,7 @@ class Config:
     max_args: int = 4
     max_funcs: int = 10
     max_globals: int = 1
+    max_casts: int = 0
 
     _user_rules: set[str] = field(default_factory=set)
     _user_limits: set[str] = field(default_factory=set)
@@ -117,18 +117,21 @@ class Config:
 
 # Presets (override defaults)
 PRESETS: dict[str, dict[str, Any]] = {
+    "ppex1": {
+        "max_casts": 5,
+    },
     "42sh": {
         "max_lines": 40,
+        "max_casts": -1,
         "rules": {
             "keyword.goto": False,
-            "cast": False,
         },
     },
     "noformat": {
         "max_lines": 40,
+        "max_casts": -1,
         "rules": {
             "keyword.goto": False,
-            "cast": False,
             "format": False,
         },
     },
@@ -199,7 +202,7 @@ def load_config(
     return cfg
 
 
-_LIMIT_KEYS = ("max_lines", "max_args", "max_funcs", "max_globals")
+_LIMIT_KEYS = ("max_lines", "max_args", "max_funcs", "max_globals", "max_casts")
 
 
 def _load_toml(path: Path) -> dict[str, Any]:

@@ -174,6 +174,7 @@ def _print_config(cfg: Config, use_color: bool = True):
         ("max_args", cfg.max_args, defaults.max_args, "Max arguments per function"),
         ("max_funcs", cfg.max_funcs, defaults.max_funcs, "Max exported functions per file"),
         ("max_globals", cfg.max_globals, defaults.max_globals, "Max exported globals per file"),
+        ("max_casts", cfg.max_casts, defaults.max_casts, "Max explicit casts in the project"),
     ]
 
     categories = _group_rules(cfg)
@@ -293,7 +294,8 @@ Configuration:
   Priority: CLI flags > config file > preset > defaults
 
 Presets:
-  42sh       max_lines=40, disables: goto, cast
+  ppex1      max_casts=5
+  42sh       max_lines=40, max_casts=-1, disables: goto
   noformat   max_lines=40, disables: goto, cast, format
 
 Environment:
@@ -322,7 +324,7 @@ Exit codes:
     # Config options
     cfg_group = ap.add_argument_group('Config')
     cfg_group.add_argument('--preset', choices=list(PRESETS.keys()), metavar='NAME',
-                           help='use a preset: 42sh, noformat')
+                           help='use a preset: ppex1, 42sh, noformat')
     cfg_group.add_argument('--config', type=Path, metavar='FILE',
                            help='path to TOML config file')
 
@@ -336,6 +338,8 @@ Exit codes:
                            help='max exported functions per file [default: 10]')
     lim_group.add_argument('--max-globals', type=int, metavar='N',
                            help='max exported globals per file [default: 1]')
+    lim_group.add_argument('--max-casts', type=int, metavar='N',
+                           help='max explicit cast in the project [default: 0]')
 
     # Output
     out_group = ap.add_argument_group('Output')
@@ -383,6 +387,7 @@ Exit codes:
             max_args=args.max_args,
             max_funcs=args.max_funcs,
             max_globals=args.max_globals,
+            max_casts=args.max_casts,
         )
     except ConfigError as e:
         print(f"epita-coding-style: error: {e}", file=sys.stderr)

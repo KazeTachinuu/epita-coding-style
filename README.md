@@ -66,6 +66,7 @@ This outputs a complete, commented TOML config you can customize.
 ### Presets
 
 ```bash
+epita-coding-style --preset ppex1 src/      # max 5 casts allowed
 epita-coding-style --preset 42sh src/      # 40 lines, goto/cast allowed
 epita-coding-style --preset noformat src/  # Same + skip clang-format
 ```
@@ -75,10 +76,10 @@ epita-coding-style --preset noformat src/  # Same + skip clang-format
 ```toml
 # .epita-style.toml
 max_lines = 40
+max_casts = -1  # Allow explicit casts
 
 [rules]
 "keyword.goto" = false  # Allow goto
-"cast" = false          # Allow casts
 ```
 
 The same keys work under `[tool.epita-coding-style]` in `pyproject.toml`.
@@ -91,6 +92,7 @@ The same keys work under `[tool.epita-coding-style]` in `pyproject.toml`.
 | `max_args` | 4 | 4 | Max arguments per function |
 | `max_funcs` | 10 | n/a | Max exported functions per file (C only) |
 | `max_globals` | 1 | n/a | Max exported globals per file (C only) |
+| `max_casts` | 0 | n/a | Max casts in the project (a negative value allows an infinite number of explicit casts) |
 
 ## clang-format
 

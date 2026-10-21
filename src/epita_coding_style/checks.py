@@ -17,6 +17,9 @@ _INIT_ASSIGN = re.compile(r'(?<![!=<>])=(?!=)')
 _CLANG_ERROR = re.compile(r'^.*:(\d+):\d+: (?:error|warning):')
 _DIGRAPHS = ('??=', '??/', "??'", '??(', '??)', '??!', '??<', '??>', '??-', '<%', '%>', '<:', ':>')
 
+# Global variables for project-wide object
+casts_count: int = 0
+cast_violations: list[Violation] = []
 
 def _comment_ranges(nodes: NodeCache) -> list[tuple[int, int]]:
     """Return byte ranges of all comment nodes in the AST."""
@@ -405,6 +408,8 @@ _CLANG_FORMAT_CANDIDATES = {
 
 def check_misc(path: str, nodes: NodeCache, lines: list[str], cfg: Config) -> list[Violation]:
     """Check misc rules (declarations, control structures, goto, cast)."""
+    global casts_count, cast_violations
+
     v = []
 
     # AST-based check for multiple declarations on one line
@@ -430,18 +435,22 @@ def check_misc(path: str, nodes: NodeCache, lines: list[str], cfg: Config) -> li
                               line_content=line_at(lines, node.start_point[0]),
                               column=node.start_point[1]))
 
-    # AST-based checks for goto and cast
+    # AST-based checks for goto
     if cfg.is_enabled("keyword.goto"):
         for node in nodes.get('goto_statement'):
             line_num = node.start_point[0] + 1
             v.append(Violation(path, line_num, "keyword.goto", "goto not allowed",
                               line_content=line_at(lines, node.start_point[0]), column=node.start_point[1]))
 
-    if cfg.is_enabled("cast"):
-        for node in nodes.get('cast_expression'):
-            line_num = node.start_point[0] + 1
-            v.append(Violation(path, line_num, "cast", "Explicit cast not allowed",
-                              line_content=line_at(lines, node.start_point[0]), column=node.start_point[1]))
+    # AST-based checks for cast
+    for node in nodes.get('cast_expression'):
+        casts_count += 1
+        line_num = node.start_point[0] + 1
+        cast_violations.append(Violation(path, line_num, "cast", f"Expected at most {cfg.max_casts} explicit casts",
+                          line_content=line_at(lines, node.start_point[0]), column=node.start_point[1]))
+    if casts_count > cfg.max_casts > -1:
+        for _ in range(len(cast_violations)):
+            v.append(cast_violations.pop(0))
 
     # stat.sep: comma operator allowed only in 'for' clauses (spec 5.25)
     if cfg.is_enabled("stat.sep"):
