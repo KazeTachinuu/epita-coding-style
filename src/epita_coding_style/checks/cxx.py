@@ -6,10 +6,15 @@ import os
 import re
 from itertools import pairwise
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ..config import Config
 from ..model import Severity, Source, Violation, child, find_nodes
 from .common import params
+
+if TYPE_CHECKING:
+    from tree_sitter import Node
+
+    from ..config import Config
 
 _C_HEADERS = {
     "assert.h",
@@ -176,7 +181,7 @@ def _check_include_order(src: Source) -> list[Violation]:
                 kind = "self" if os.path.splitext(fname)[0] == base else "local"
                 includes.append((line, kind, fname))
 
-    def flag(line, message, severity=Severity.MAJOR):
+    def flag(line: int, message: str, severity: Severity = Severity.MAJOR) -> None:
         v.append(
             src.violation("cpp.include.order", message, line, severity=severity, show_line=True)
         )
@@ -276,7 +281,7 @@ def check_cxx_globals(src: Source, cfg: Config) -> list[Violation]:
 
 
 def check_cxx_naming(src: Source, cfg: Config) -> list[Violation]:
-    """Check CXX naming rules: class/struct names (CamelCase), namespace (lowercase + closing comment)."""
+    """Check CXX naming: CamelCase classes/structs, lowercase namespaces with closing comment."""
     v = []
 
     if cfg.is_enabled("naming.class"):
@@ -398,7 +403,7 @@ def check_cxx_declarations(src: Source, cfg: Config) -> list[Violation]:
     return v
 
 
-def _is_type(src: Source, node, name: str) -> bool:
+def _is_type(src: Source, node: Node, name: str) -> bool:
     return node.type == "type_identifier" and src.text_of(node) == name
 
 
@@ -427,8 +432,10 @@ def _check_explicit_ctors(src: Source) -> list[Violation]:
                 param = plist[0]
                 is_copy_or_move = child(param, "reference_declarator") and any(
                     _is_type(src, c, name)
-                    or c.type == "template_type"
-                    and any(_is_type(src, gc, name) for gc in c.children)
+                    or (
+                        c.type == "template_type"
+                        and any(_is_type(src, gc, name) for gc in c.children)
+                    )
                     for c in param.children
                 )
                 if not is_copy_or_move:
@@ -554,11 +561,10 @@ def check_cxx_writing(src: Source, cfg: Config) -> list[Violation]:
                 if part.type != "parameter_list":
                     continue
                 for param in part.children:
-                    if (
-                        param.type == "parameter_declaration"
-                        and "&" not in (t := src.text_of(param))
-                        and t != "..."
-                    ):
+                    if param.type != "parameter_declaration":
+                        continue
+                    t = src.text_of(param)
+                    if "&" not in t and t != "...":
                         v.append(
                             src.at(
                                 param,
@@ -598,11 +604,10 @@ def check_cxx_writing(src: Source, cfg: Config) -> list[Violation]:
         for func in src.nodes.get("function_definition"):
             if not any(src.text_of(n) == "operator=" for n in find_nodes(func, "operator_name")):
                 continue
+            block = child(func, "compound_statement")
             if not child(func, "reference_declarator"):
                 msg = "Assignment operator should return Class&"
-            elif (body := child(func, "compound_statement")) and "return *this" not in src.text_of(
-                body
-            ):
+            elif block and "return *this" not in src.text_of(block):
                 msg = "Assignment operator should return *this"
             else:
                 continue

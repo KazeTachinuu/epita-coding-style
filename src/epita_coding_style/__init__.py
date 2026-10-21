@@ -11,16 +11,16 @@ from .lint import check_file
 from .model import Lang, Severity, Violation, lang_from_path
 
 __all__ = [
-    "check_file",
-    "Config",
-    "ConfigError",
     "PRESETS",
     "RULES",
-    "load_config",
-    "Violation",
-    "Severity",
+    "Config",
+    "ConfigError",
     "Lang",
-    "lang_from_path",
-    "main",
+    "Severity",
+    "Violation",
     "__version__",
+    "check_file",
+    "lang_from_path",
+    "load_config",
+    "main",
 ]

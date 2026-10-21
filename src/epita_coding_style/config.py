@@ -164,7 +164,7 @@ PRESETS: dict[str, dict[str, Any]] = {
 def load_config(
     config_path: Path | None = None,
     preset: str | None = None,
-    **overrides: Any,
+    **overrides: int | None,
 ) -> Config:
     """Build a Config: CLI overrides > config file > preset > defaults."""
     cfg = Config()
@@ -179,7 +179,7 @@ def load_config(
 
 
 def _find_config(config_path: Path | None) -> tuple[dict[str, Any], str]:
-    """The explicit config file, or the first one found walking up from cwd."""
+    """Load the explicit config file, or the first one found walking up from cwd."""
     if config_path:
         if not config_path.exists():
             raise ConfigError(f"config file not found: {config_path}")
@@ -207,8 +207,8 @@ def _load_toml(path: Path) -> dict[str, Any]:
         raise ConfigError(f"{path}: cannot read: {e.strerror or e}") from e
 
 
-def _preset(name: Any, source: str) -> dict[str, Any]:
-    if name not in PRESETS:
+def _preset(name: object, source: str) -> dict[str, Any]:
+    if not isinstance(name, str) or name not in PRESETS:
         raise ConfigError(f"{source}: unknown preset '{name}' (choose from: {', '.join(PRESETS)})")
     return PRESETS[name]
 

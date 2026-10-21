@@ -9,7 +9,8 @@ from epita_coding_style import RULES, Config, ConfigError, load_config
 
 def test_rules_table_well_formed():
     for name, (desc, category, lang) in RULES.items():
-        assert desc and category, name
+        assert desc, name
+        assert category, name
         assert lang in ("c", "cxx", "both"), name
 
 

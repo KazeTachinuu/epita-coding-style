@@ -70,7 +70,8 @@ def test_export_fun_header_not_checked(rules):
 
 def test_export_fun_is_major(lint):
     violations = [v for v in lint(_make_funcs(11)) if v.rule == "export.fun"]
-    assert violations and all(v.severity == Severity.MAJOR for v in violations)
+    assert violations
+    assert all(v.severity == Severity.MAJOR for v in violations)
 
 
 # =============================================================================
@@ -197,7 +198,8 @@ def test_export_other_header_not_checked(rules):
 
 def test_export_other_is_major(lint):
     violations = [v for v in lint("int a;\nint b;\n") if v.rule == "export.other"]
-    assert violations and all(v.severity == Severity.MAJOR for v in violations)
+    assert violations
+    assert all(v.severity == Severity.MAJOR for v in violations)
 
 
 def test_export_other_max_globals_zero(tmp_path):

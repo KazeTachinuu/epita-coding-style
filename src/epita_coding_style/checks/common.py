@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import os
 import re
+from typing import TYPE_CHECKING
 
-from ..config import Config
 from ..model import Severity, Source, Violation, child, find_nodes
 from .clang_format import clang_format_active
+
+if TYPE_CHECKING:
+    from tree_sitter import Node
+
+    from ..config import Config
 
 _CHAR_LITERAL = re.compile(r"'(?:\\.|[^'\\])'")
 _STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\])*"')
@@ -46,11 +51,11 @@ def check_file_format(src: Source, cfg: Config) -> list[Violation]:
     if cfg.is_enabled("lines.empty"):
         # The final '' from a trailing newline is an artifact, not a line
         last = len(lines) - 1 if lines[-1] == "" else len(lines)
-        for i in range(2, last + 1):
-            if not lines[i - 1].strip() and not lines[i - 2].strip():
-                v.append(
-                    src.violation("lines.empty", "No consecutive empty lines", i, show_line=True)
-                )
+        v.extend(
+            src.violation("lines.empty", "No consecutive empty lines", i, show_line=True)
+            for i in range(2, last + 1)
+            if not lines[i - 1].strip() and not lines[i - 2].strip()
+        )
 
     if cfg.is_enabled("file.trailing"):
         for i, line in enumerate(lines, 1):
@@ -136,7 +141,7 @@ def check_braces(src: Source, cfg: Config) -> list[Violation]:
     return v
 
 
-def function_declarator(node):
+def function_declarator(node: Node) -> Node | None:
     """Innermost function_declarator under node: the one naming the function.
 
     For function pointer returns like int (*f(void))(int), declarators nest.
@@ -153,7 +158,7 @@ def function_declarator(node):
     return None
 
 
-def params(func_decl) -> list | None:
+def params(func_decl: Node) -> list[Node] | None:
     """Parameter declarations of a function_declarator, None without a parameter list."""
     plist = child(func_decl, "parameter_list")
     return (
@@ -161,7 +166,7 @@ def params(func_decl) -> list | None:
     )
 
 
-def _count_function_lines(body, lines: list[str]) -> int:
+def _count_function_lines(body: Node, lines: list[str]) -> int:
     """Count non-trivial lines in a function body."""
     count = 0
     for ln in range(body.start_point[0], body.end_point[0] + 1):
@@ -181,7 +186,7 @@ def check_functions(src: Source, cfg: Config) -> list[Violation]:
     max_args = cfg.max_args
     max_lines = cfg.max_lines
 
-    def check_params(node, name: str, plist: list | None, void_msg: str):
+    def check_params(node: Node, name: str, plist: list[Node] | None, void_msg: str) -> None:
         # (void) parses as a parameter_declaration, so empty params means ()
         if chk_void and plist == []:
             v.append(src.at(node, "fun.proto.void", f"'{name}' {void_msg}", column=False))
@@ -317,8 +322,10 @@ def check_preprocessor(src: Source, cfg: Config) -> list[Violation]:
 
 
 def _check_comment_multi(src: Source) -> list[Violation]:
-    """Multi-line comments: bare '/*' or '/**' opener, '**' continuations,
-    '*/' alone on the closing line (spec 4.7)."""
+    """Check multi-line comments (spec 4.7).
+
+    Bare '/*' or '/**' opener, '**' continuations, '*/' alone on the closing line.
+    """
     v = []
     for n in src.nodes.get("comment"):
         txt = src.text_of(n)
@@ -376,22 +383,27 @@ def check_misc(src: Source, cfg: Config) -> list[Violation]:
                 v.append(src.at(decl, "decl.single", "One declaration per line"))
 
     if cfg.is_enabled("stat.asm"):
-        for node in nodes.get("gnu_asm_expression", "gnu_asm_statement"):
-            v.append(src.at(node, "stat.asm", "asm not allowed"))
+        v.extend(
+            src.at(node, "stat.asm", "asm not allowed")
+            for node in nodes.get("gnu_asm_expression", "gnu_asm_statement")
+        )
 
     if cfg.is_enabled("keyword.goto"):
-        for node in nodes.get("goto_statement"):
-            v.append(src.at(node, "keyword.goto", "goto not allowed"))
+        v.extend(
+            src.at(node, "keyword.goto", "goto not allowed") for node in nodes.get("goto_statement")
+        )
 
     if cfg.is_enabled("cast"):
-        for node in nodes.get("cast_expression"):
-            v.append(src.at(node, "cast", "Explicit cast not allowed"))
+        v.extend(
+            src.at(node, "cast", "Explicit cast not allowed")
+            for node in nodes.get("cast_expression")
+        )
 
     # stat.sep: comma operator allowed only in 'for' clauses (spec 5.25)
     if cfg.is_enabled("stat.sep"):
         for node in nodes.get("comma_expression"):
             parent = node.parent
-            if parent.type == "comma_expression":
+            if parent is not None and parent.type == "comma_expression":
                 continue  # report only the outermost expression
             while parent is not None and parent.type == "parenthesized_expression":
                 parent = parent.parent

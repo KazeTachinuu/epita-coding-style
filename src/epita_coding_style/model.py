@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from tree_sitter import Node, Parser
 
 
 class Severity(Enum):
@@ -53,11 +59,11 @@ class Violation:
 
 
 @cache
-def _parser(lang: Lang):
+def _parser(lang: Lang) -> Parser:
     # Imported lazily: --version, --help and --list-rules never parse
-    import tree_sitter_c
-    import tree_sitter_cpp
-    from tree_sitter import Language, Parser
+    import tree_sitter_c  # noqa: PLC0415
+    import tree_sitter_cpp  # noqa: PLC0415
+    from tree_sitter import Language, Parser  # noqa: PLC0415
 
     grammar = tree_sitter_cpp if lang == Lang.CXX else tree_sitter_c
     return Parser(Language(grammar.language()))
@@ -66,16 +72,16 @@ def _parser(lang: Lang):
 class NodeCache:
     """Indexes all AST nodes by type in one traversal."""
 
-    def __init__(self, root):
+    def __init__(self, root: Node) -> None:
         self.root = root
-        self._by_type: dict[str, list] = {}
+        self._by_type: dict[str, list[Node]] = {}
         stack = [root]
         while stack:
             n = stack.pop()
             self._by_type.setdefault(n.type, []).append(n)
             stack.extend(reversed(n.children))
 
-    def get(self, *types) -> list:
+    def get(self, *types: str) -> list[Node]:
         """All nodes of the given types, document order within each type."""
         if len(types) == 1:
             return self._by_type.get(types[0], [])
@@ -104,10 +110,10 @@ class Source:
             path, lang, text, text.split("\n"), data, NodeCache(_parser(lang).parse(data).root_node)
         )
 
-    def text_of(self, node) -> str:
+    def text_of(self, node: Node) -> str:
         return self.data[node.start_byte : node.end_byte].decode()
 
-    def id_of(self, node) -> str | None:
+    def id_of(self, node: Node) -> str | None:
         """Text of the first identifier in node."""
         n = next(find_nodes(node, "identifier"), None)
         return None if n is None else self.text_of(n)
@@ -116,7 +122,7 @@ class Source:
         """Line at 0-based index, or None if out of range."""
         return self.lines[index] if 0 <= index < len(self.lines) else None
 
-    def violation(
+    def violation(  # noqa: PLR0913 - mirrors Violation's fields
         self,
         rule: str,
         message: str,
@@ -139,7 +145,7 @@ class Source:
 
     def at(
         self,
-        node,
+        node: Node,
         rule: str,
         message: str,
         *,
@@ -153,12 +159,12 @@ class Source:
         )
 
 
-def child(node, *types):
+def child(node: Node, *types: str) -> Node | None:
     """First direct child of node matching given types, else None."""
     return next((c for c in node.children if c.type in types), None)
 
 
-def find_nodes(node, *types):
+def find_nodes(node: Node, *types: str) -> Iterator[Node]:
     """Yield all descendant nodes matching given types."""
     stack = [node]
     while stack:

@@ -58,7 +58,8 @@ def test_arg_count(rules, code, should_fail):
 def test_arg_count_is_major(lint):
     code = "int f(int a, int b, int c, int d, int e) { return 0; }\n"
     violations = [v for v in lint(code) if v.rule == "fun.arg.count"]
-    assert violations and all(v.severity == Severity.MAJOR for v in violations)
+    assert violations
+    assert all(v.severity == Severity.MAJOR for v in violations)
 
 
 def test_func_length_40_ok(rules):

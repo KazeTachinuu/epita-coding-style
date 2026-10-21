@@ -114,7 +114,7 @@ def _parser() -> argparse.ArgumentParser:
     return ap
 
 
-def _colors(no_color: bool) -> Colors:
+def _colors(*, no_color: bool) -> Colors:
     """--no-color > NO_COLOR > FORCE_COLOR > stdout is a terminal."""
     if no_color or os.environ.get("NO_COLOR"):
         return Colors()
@@ -130,7 +130,7 @@ def _rules_by_category() -> dict[str, list[str]]:
     return categories
 
 
-def _print_rules(c: Colors):
+def _print_rules(c: Colors) -> None:
     for i, (cat, rules) in enumerate(_rules_by_category().items()):
         if i:
             print()
@@ -139,18 +139,18 @@ def _print_rules(c: Colors):
             print(f"  {rule:<24} {c.dim}{RULES[rule][0]}{c.reset}")
 
 
-def _print_config(cfg: Config, c: Colors):
+def _print_config(cfg: Config, c: Colors) -> None:
     """Print cfg as loadable TOML: explicit settings, defaults commented out."""
     defaults = Config()
 
-    def line(code: str, is_set: bool, comment: str):
+    def line(code: str, comment: str, *, is_set: bool) -> None:
         code = code if is_set else f"# {code}"
         print(f"{c.cyan if is_set else c.dim}{code:<38}{c.reset}{c.dim}# {comment}{c.reset}")
 
     print(f"{c.dim}# Copy to .epita-style.toml; uncomment a line to change it{c.reset}")
     for name, desc in LIMITS.items():
         is_set = name in cfg.user_limits
-        line(f"{name} = {getattr(cfg if is_set else defaults, name)}", is_set, desc)
+        line(f"{name} = {getattr(cfg if is_set else defaults, name)}", desc, is_set=is_set)
 
     print("\n[rules]")
     for cat, rules in _rules_by_category().items():
@@ -158,7 +158,7 @@ def _print_config(cfg: Config, c: Colors):
         for rule in rules:
             is_set = rule in cfg.user_rules
             enabled = cfg.rules[rule] if is_set else True
-            line(f'"{rule}" = {str(enabled).lower()}', is_set, RULES[rule][0])
+            line(f'"{rule}" = {str(enabled).lower()}', RULES[rule][0], is_set=is_set)
 
 
 def _render(v: Violation, c: Colors) -> str:
@@ -176,7 +176,7 @@ def _render(v: Violation, c: Colors) -> str:
     return out
 
 
-def _print_fix_hint(results: dict[str, list[Violation]], c: Colors):
+def _print_fix_hint(results: dict[str, list[Violation]], c: Colors) -> None:
     """Print the clang-format commands that fix the files needing formatting."""
     by_config: dict[str, list[str]] = {}
     for path, violations in results.items():
@@ -191,11 +191,11 @@ def _print_fix_hint(results: dict[str, list[Violation]], c: Colors):
             print("  " + shlex.join(["clang-format", f"--style=file:{config}", "-i", *paths]))
 
 
-def main():
+def main() -> int:
     ap = _parser()
     args = ap.parse_args()
     start_update_check()
-    c = _colors(args.no_color)
+    c = _colors(no_color=args.no_color)
 
     if args.list_rules:
         _print_rules(c)

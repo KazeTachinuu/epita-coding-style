@@ -70,9 +70,33 @@ target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "B", "UP", "SIM", "PIE", "I", "ARG"]
-ignore = ["E501"]
-per-file-ignores = { "src/epita_coding_style/__init__.py" = ["E402"] }
+select = ["ALL"]
+ignore = [
+    "D101", "D102", "D103", "D107",  # docstrings where they add information, not on every definition
+    "CPY001",  # license is in LICENSE
+    "T201",  # print is the CLI's output
+    "TID252",  # relative imports inside the package
+    "EM102", "TRY003",  # inline exception messages read better here
+    "S603", "S607",  # git/clang-format run with fixed argv from PATH by design
+    "COM812",  # conflicts with the formatter
+    "C901", "PLR0912", "PLR0915",  # check functions mirror the spec's rule lists; splitting them hides the rules
+    "PTH",  # the API takes str paths; os.path on str is fine
+    "PERF401",  # a for/append loop reads better than extend(genexpr) around a multi-line call
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+"src/epita_coding_style/__init__.py" = ["E402"]
+"tests/**" = [
+    "S101", "PLR2004", "ANN", "D", "INP001", "FBT", "SLF001", "EM101",
+    "ERA001",  # section headers name rules, e.g. `# exp.linebreak`, which reads as code
+]
+
+[tool.ruff.lint.flake8-pytest-style]
+parametrize-names-type = "csv"  # "code,expected" is the style used throughout the tests
 
 [tool.mypy]
 files = ["src"]
+strict = true

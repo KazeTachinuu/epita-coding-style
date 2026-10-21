@@ -7,9 +7,12 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ..config import Config
 from ..model import Lang, Violation, lang_from_path, lang_of
+
+if TYPE_CHECKING:
+    from ..config import Config
 
 _CLANG_ERROR = re.compile(r"^(.*):(\d+):\d+: (?:error|warning):")
 _CONFIGS = {Lang.C: ".clang-format-c", Lang.CXX: ".clang-format-cxx"}
@@ -27,7 +30,7 @@ def clang_format_config(path: str) -> str:
 
 
 def clang_format_active(cfg: Config) -> bool:
-    """The format rule is enabled and clang-format is installed."""
+    """Whether the format rule is enabled and clang-format is installed."""
     return cfg.is_enabled("format") and shutil.which("clang-format") is not None
 
 
@@ -53,6 +56,7 @@ def _run_clang_format(config: str, paths: list[str]) -> dict[str, list[Violation
         result = subprocess.run(
             ["clang-format", f"--style=file:{config}", "--dry-run", "--Werror", *paths],
             capture_output=True,
+            check=False,
             text=True,
             timeout=30 + len(paths),
         )

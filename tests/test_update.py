@@ -14,8 +14,7 @@ from epita_coding_style import __version__, update
 @pytest.fixture
 def pypi(monkeypatch, tmp_path):
     """Fresh cache, no opt-out; returns pypi(version): fake PyPI's latest, in a terminal."""
-    monkeypatch.setattr(update, "_thread", None)
-    monkeypatch.setattr(update, "_newer", None)
+    monkeypatch.setattr(update._Check, "started", None)
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
     monkeypatch.delenv("CI", raising=False)
     monkeypatch.delenv("EPITA_STYLE_NO_UPDATE_CHECK", raising=False)

@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 
 FILES = {
-    "clean.c": '#include <stdio.h>\n\nint main(void)\n{\n    printf("Hello\\n");\n    return 0;\n}\n',
+    "clean.c": (
+        '#include <stdio.h>\n\nint main(void)\n{\n    printf("Hello\\n");\n    return 0;\n}\n'
+    ),
     "bad_goto.c": "void f(void)\n{\nlabel:\n    goto label;\n}\n",
     "bad_cast.c": "void f(void)\n{\n    void *p = 0;\n    int x = (int)p;\n}\n",
     "bad_lines.c": "void f(void)\n{\n    int x = 1;\n" + "    x++;\n" * 30 + "}\n",
@@ -124,4 +126,4 @@ def test_format_detected(cli):
 
 def test_console_script():
     exe = Path(sys.executable).with_name("epita-coding-style")
-    assert subprocess.run([exe, "clean.c"], capture_output=True).returncode == 0
+    assert subprocess.run([exe, "clean.c"], capture_output=True, check=False).returncode == 0

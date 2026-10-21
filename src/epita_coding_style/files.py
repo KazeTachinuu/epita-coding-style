@@ -10,7 +10,7 @@ from pathlib import Path
 from .model import lang_from_path
 
 
-def _git(directory: str, *args: str, check: bool = False) -> subprocess.CompletedProcess:
+def _git(directory: str, *args: str, check: bool = False) -> subprocess.CompletedProcess[bytes]:
     # The scanned repo may be untrusted: its .git/config could set core.fsmonitor
     # to a command that git runs even for read-only commands like ls-files.
     return subprocess.run(

@@ -556,16 +556,18 @@ def test_comment_blindness_edges(rules, code, rule, should_fail):
     assert (rule in rules(code, ".cc")) == should_fail
 
 
+URL_THEN_OPERATOR_AT_EOL = (
+    'int f(const char *s);\nint g(int y)\n{\n    int x = f("http://x") +\n'
+    "        y;\n    return x;\n}\n"
+)
+
+
 @pytest.mark.parametrize(
     "code,rule,should_fail",
     [
         ("/* start\nint x = y +\n   end */\nint g = 0;\n", "exp.linebreak", False),
         ("/* start\nint &x = y;\n   end */\nint g = 0;\n", "decl.ref", False),
-        (
-            'int f(const char *s);\nint g(int y)\n{\n    int x = f("http://x") +\n        y;\n    return x;\n}\n',
-            "exp.linebreak",
-            True,
-        ),
+        (URL_THEN_OPERATOR_AT_EOL, "exp.linebreak", True),
     ],
     ids=["op-inside-block-comment", "ref-inside-block-comment", "url-string-kept"],
 )

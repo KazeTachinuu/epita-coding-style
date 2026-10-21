@@ -143,4 +143,5 @@ def test_braces_fallback_when_clang_format_missing(rules, monkeypatch):
     """Without clang-format, check_braces takes over instead of silence."""
     monkeypatch.setattr(shutil, "which", lambda _: None)
     found = rules("void f(void) {\n    return;\n}\n")
-    assert "braces" in found and "format" not in found
+    assert "braces" in found
+    assert "format" not in found

@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-from ..config import Config
-from ..model import Source, Violation
+from typing import TYPE_CHECKING
+
 from .common import function_declarator
 
+if TYPE_CHECKING:
+    from tree_sitter import Node
 
-def _has_storage(src: Source, decl, keyword: str) -> bool:
+    from ..config import Config
+    from ..model import Source, Violation
+
+
+def _has_storage(src: Source, decl: Node, keyword: str) -> bool:
     return any(
         src.text_of(c) == keyword for c in decl.children if c.type == "storage_class_specifier"
     )

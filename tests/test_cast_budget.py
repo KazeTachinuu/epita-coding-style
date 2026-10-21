@@ -61,7 +61,8 @@ def test_cast_rule_disabled_ignores_budget(tmp_path):
 def test_cxx_files_use_their_own_rule(tmp_path):
     [a] = write(tmp_path, **{"a.cc": CASTS_3})
     rules = {v.rule for v in lint_files([a], cfg(max_casts=1))[a]}
-    assert "cast" not in rules and "global.casts" in rules
+    assert "cast" not in rules
+    assert "global.casts" in rules
 
 
 def test_check_file_applies_budget_to_that_file(tmp_path):
